@@ -6,6 +6,22 @@ Copy everything below the line into Claude Code.
 
 /goal Build **INFECTED** — a production-ready, fully playable, public 30-player Roblox round game — end to end, in the existing repo at `~/roblox-infected` (public GitHub: `oh-ashen-one/roblox-infected`). Work autonomously through every phase below; only stop for things that literally require me (Roblox sign-in, publish confirmation, Robux-priced product creation approvals). The bar is production: assume 1,000+ concurrent players across many 30-player servers on day one. Read `docs/research.md` first — it contains the competitor research this design is based on; follow its conclusions.
 
+**COMPLETION MANDATE — this goal is not done until the game is LIVE.** Do not stop at a plan, a skeleton, a "core loop works," or a single phase. Keep working phase after phase, session after session if needed, until every item in the Definition of Done below is checked. If you finish a phase, immediately start the next one. If something blocks one track (e.g. waiting on me), keep building another track in parallel — never idle. Never declare victory early: "done" means a stranger can find the game on Roblox, join a public 30-player server, and play full rounds without hitting a bug.
+
+## Definition of Done (ALL must be true before you stop)
+
+- [ ] Every round-flow state below works end to end, verified in multi-client playtests (Studio local server with 4+ simulated players), including all edge cases in Phase 6.
+- [ ] All three maps built, streamed, and rotating via map vote.
+- [ ] Combat fully server-authoritative and playtested: guns, throwing knives, conversion, spawn protection, anti-cheat rejections actually observed working.
+- [ ] Full meta shipped: economy payouts, XP/levels, shop, crates with card-flip reveal, skins equipping and persisting via ProfileStore across rejoins (tested).
+- [ ] All UI screens exist and work on desktop + mobile touch layout.
+- [ ] Gamepasses + dev products created, wired, and test-purchased in Studio sandbox; `ProcessReceipt` idempotency verified.
+- [ ] CI green: selene, stylua --check, rojo build, and the test suite all pass on main.
+- [ ] Game published PUBLIC on Roblox with 30-player servers, icon, thumbnails, and a keyword-rich description; I confirmed the publish and at least one real public server was joined and a full round played.
+- [ ] Post-launch runbook committed (`docs/runbook.md`): what to monitor, how to hotfix, exploit-report triage.
+
+If any box is unchecked, the goal is still in progress — continue.
+
 ## The game
 
 **Concept:** COD Infected × Murder Mystery 2. 30 players per server. Each round, ONE player is secretly infected — no visual difference, nobody knows who. The hidden infected hunts with one-hit throwing knives (thrown + melee stab). Every kill converts the victim into a *visible* zombie who joins the infected team with a weaker knife. Survivors carry real guns. Round ends on timer or full infection; then a dramatic reveal screen shows who Patient Zero was, who survived, and MVP stats.
@@ -55,4 +71,4 @@ Copy everything below the line into Claude Code.
 6. **Hardening:** multi-client playtests of every win/edge case (Patient Zero leaves mid-round → reassign or end round; server shutdown mid-round → BindToClose saves; sub-4-player lobbies), rate-limit audit, memory profile.
 7. **Ship:** publish public to Roblox (I'll be signed in — pause for my confirm on the actual publish + product price approvals), fill out the game page (icon, thumbnails, description with genre keywords), then a post-launch checklist doc (what to monitor: server crashes, exploit reports, D1 retention levers).
 
-Throughout: playtest via Studio's multi-player local server after each phase — don't declare a phase done until you've actually watched the behavior work. When something needs my Roblox session (plugin install, sign-in, publish), tell me exactly what to click and wait.
+Throughout: playtest via Studio's multi-player local server after each phase — don't declare a phase done until you've actually watched the behavior work. When something needs my Roblox session (plugin install, sign-in, publish), tell me exactly what to click and wait — but keep building everything else while you wait. Do not end until the entire Definition of Done at the top is satisfied: a complete, tested, live, publicly playable production game.
