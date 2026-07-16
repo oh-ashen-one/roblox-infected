@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rokit toolchain
+        uses: CompeyDev/setup-rokit@v0.1.2
+
+      - name: Install Wally packages
+        run: wally install
+
+      - name: Lint (selene)
+        run: selene src
+
+      - name: Format check (stylua)
+        run: stylua --check src tests
+
+      - name: Tests (lune)
+        run: lune run tests/run
+
+      - name: Build place (rojo)
+        run: rojo build -o INFECTED.rbxlx
