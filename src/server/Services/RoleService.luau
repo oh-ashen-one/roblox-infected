@@ -21,6 +21,8 @@ export type Deps = {
 	onConversion: (victim: Player, killer: Player?) -> (), -- extend timer, rewards, alerts
 	onSurvivorCountChanged: (count: number) -> (),
 	onPatientZeroGone: () -> (), -- PZ left with no zombies yet -> round should end
+	getSurvivorSpawn: (() -> CFrame?)?, -- map spawn points (nil -> default spawn)
+	getZombieSpawn: ((survivorRoots: { BasePart }) -> CFrame?)?,
 }
 
 local rng = Random.new()
@@ -153,6 +155,13 @@ function RoleService:assignRoles(playersInRound: { Player })
 	for _, player in playersInRound do
 		player:LoadCharacter()
 		local character = player.Character or player.CharacterAdded:Wait()
+		if self._deps.getSurvivorSpawn then
+			local spawnCFrame = self._deps.getSurvivorSpawn()
+			local root = character:WaitForChild("HumanoidRootPart", 5)
+			if spawnCFrame and root and root:IsA("BasePart") then
+				root.CFrame = spawnCFrame
+			end
+		end
 		applySpawnProtection(character)
 		self:_watchCharacter(player, character)
 		local role = self._roles[player]
@@ -205,6 +214,21 @@ end
 function RoleService:_spawnAsZombie(player: Player)
 	player:LoadCharacter()
 	local character = player.Character or player.CharacterAdded:Wait()
+	if self._deps.getZombieSpawn then
+		local survivorRoots = {}
+		for _, survivor in self:survivors() do
+			local sChar = survivor.Character
+			local sRoot = sChar and sChar:FindFirstChild("HumanoidRootPart")
+			if sRoot and sRoot:IsA("BasePart") then
+				table.insert(survivorRoots, sRoot)
+			end
+		end
+		local spawnCFrame = self._deps.getZombieSpawn(survivorRoots)
+		local root = character:WaitForChild("HumanoidRootPart", 5)
+		if spawnCFrame and root and root:IsA("BasePart") then
+			root.CFrame = spawnCFrame
+		end
+	end
 	applyZombieAppearance(character)
 	applySpawnProtection(character)
 	self:_watchCharacter(player, character)

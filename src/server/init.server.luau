@@ -20,13 +20,22 @@ local RoundService = require(script.Services.RoundService)
 local RoleService = require(script.Services.RoleService)
 local CombatService = require(script.Services.CombatService)
 local AntiCheatService = require(script.Services.AntiCheatService)
+local MapService = require(script.Services.MapService)
 
 local remotes = Remotes.server()
 
 local roundService
 local roleService
 
+local mapService = MapService.new({ remotes = remotes })
+
 roleService = RoleService.new({
+	getSurvivorSpawn = function()
+		return mapService:randomSurvivorSpawn()
+	end,
+	getZombieSpawn = function(survivorRoots)
+		return mapService:zombieSpawnNearAction(survivorRoots)
+	end,
 	remotes = remotes,
 	onConversion = function(victim: Player, killer: Player?)
 		roundService:recordConversion()
@@ -47,6 +56,7 @@ roleService = RoleService.new({
 roundService = RoundService.new({
 	remotes = remotes,
 	onRoundStart = function(playersInRound)
+		mapService:loadVotedMap()
 		roleService:assignRoles(playersInRound)
 	end,
 	onRoundEnd = function(winner)
@@ -62,7 +72,10 @@ roundService = RoundService.new({
 		})
 		roleService:endRound()
 	end,
-	onIntermission = function() end,
+	onIntermission = function()
+		mapService:unload()
+		mapService:openVote()
+	end,
 })
 
 local combatService = CombatService.new({
@@ -85,6 +98,7 @@ roleService:start()
 roundService:start()
 combatService:start()
 antiCheatService:start()
+mapService:start()
 
 -- Studio-only smoke test: exercises the whole round loop with fast timers and
 -- scripted deaths so a local multi-client playtest verifies itself in the Output.
