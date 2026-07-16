@@ -16,6 +16,7 @@ local Pings = require(script.UI.Pings)
 local Touch = require(script.UI.Touch)
 local Effects = require(script.UI.Effects)
 local Settings = require(script.UI.Settings)
+local Sounds = require(script.UI.Sounds)
 
 local remotes = Remotes.client()
 
@@ -29,5 +30,6 @@ Pings.start(remotes)
 Touch.start(remotes, actions)
 Effects.start(remotes)
 Settings.start()
+Sounds.start(remotes)
 
 print("[INFECTED] Client booted")

@@ -107,6 +107,19 @@ local GameConfig = {
 		},
 	},
 
+	-- Roblox audio asset ids; 0 disables a sound. Filled/verified in the Studio pass
+	-- (audio must be owned/licensed to play for all users, so IDs are set there).
+	Sounds = {
+		GunShot = 0,
+		KnifeThrow = 0,
+		Conversion = 0,
+		RoundStart = 0,
+		SurvivorsWin = 0,
+		InfectedWin = 0,
+		Heartbeat = 0, -- endgame tension loop
+		LobbyMusic = 0,
+	},
+
 	-- Filled in at publish time (Phase 7); 0 = not yet created.
 	Products = {
 		GamePasses = {
