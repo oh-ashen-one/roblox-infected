@@ -23,11 +23,21 @@ rojo serve                      # live sync while editing
 
 ## Repo layout
 
-- `default.project.json` — Rojo project map
-- `src/server` — game loop, round state machine, combat validation, data
-- `src/client` — input, viewmodels, UI
-- `src/shared` — config, types, remotes
+- `default.project.json` — Rojo project map (StreamingEnabled workspace)
+- `src/shared` — GameConfig (every tunable), RoundMachine + Rewards + PatientZero +
+  LevelMath + CrateRoll (pure, unit-tested), Remotes (validated + rate-limited),
+  SkinCatalog
+- `src/server/Services` — Round, Role, Combat (server-auth guns/knives/melee),
+  AntiCheat, Map (vote + clone lifecycle), Data (ProfileStore), Economy,
+  Monetization (idempotent ProcessReceipt), Endgame (pings + Last Stand)
+- `src/server/Maps` — Kit + three fully-coded maps (Mall, Suburbia, Facility)
+- `src/client` — CombatController, HUD, RoleCard, RevealScreen, MapVote, Shop,
+  Pings, Touch controls
+- `tests/` — Lune test suite (`lune run tests/run`); CI runs selene, stylua,
+  tests, and a rojo build on every push
 
-## Status
+## Docs
 
-Pre-production. See `MASTER-PROMPT.md` for the full build spec.
+- `MASTER-PROMPT.md` — the full build spec
+- `docs/research.md` — competitor/design research the spec is based on
+- `docs/runbook.md` — post-launch monitoring, hotfix, and balance guide

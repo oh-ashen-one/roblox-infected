@@ -26,6 +26,12 @@ if game:GetService("RunService"):IsStudio() then
 	GameConfig.Round.MaxRoundSeconds = 90
 	GameConfig.Round.RevealSeconds = 6
 	GameConfig.Round.MinPlayersToStart = 2
+	-- Solo play-test (run-in-roblox headless verification): let a 1-player round run
+	task.delay(5, function()
+		if #Players:GetPlayers() <= 1 then
+			GameConfig.Round.MinPlayersToStart = 1
+		end
+	end)
 end
 
 local remotes = Remotes.server()
@@ -46,6 +52,10 @@ roleService = RoleService.new({
 	end,
 	getZombieSpawn = function(survivorRoots)
 		return mapService:zombieSpawnNearAction(survivorRoots)
+	end,
+	getEquippedGunSkin = function(player: Player)
+		local data = dataService:get(player)
+		return data and data.equipped and data.equipped.Gun or nil
 	end,
 	onConversion = function(victim: Player, killer: Player?)
 		roundService:recordConversion()

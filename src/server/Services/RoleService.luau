@@ -23,6 +23,7 @@ export type Deps = {
 	onPatientZeroGone: () -> (), -- PZ left with no zombies yet -> round should end
 	getSurvivorSpawn: (() -> CFrame?)?, -- map spawn points (nil -> default spawn)
 	getZombieSpawn: ((survivorRoots: { BasePart }) -> CFrame?)?,
+	getEquippedGunSkin: ((player: Player) -> string?)?, -- cosmetic gun tint
 }
 
 local rng = Random.new()
@@ -164,6 +165,10 @@ function RoleService:assignRoles(playersInRound: { Player })
 		end
 		applySpawnProtection(character)
 		self:_watchCharacter(player, character)
+		-- Everyone holds a gun — the hidden PZ must be indistinguishable
+		local WeaponVisuals = require(script.Parent.WeaponVisuals)
+		local gunSkin = self._deps.getEquippedGunSkin and self._deps.getEquippedGunSkin(player) or nil
+		WeaponVisuals.attachGun(character, gunSkin)
 		local role = self._roles[player]
 		if role == "PATIENT_ZERO" then
 			local humanoid = character:FindFirstChildOfClass("Humanoid")
