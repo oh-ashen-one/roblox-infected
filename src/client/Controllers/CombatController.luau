@@ -136,7 +136,11 @@ function CombatController.start(remotes: any)
 			return
 		end
 
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		-- LMB / gamepad right trigger: fire as gunner, claw as zombie
+		if
+			input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.KeyCode == Enum.KeyCode.ButtonR2
+		then
 			if state.role == "ZOMBIE" then
 				actions.melee()
 			else
@@ -150,13 +154,6 @@ function CombatController.start(remotes: any)
 			actions.reload()
 		elseif input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then
 			actions.setSprint(true)
-		elseif input.KeyCode == Enum.KeyCode.ButtonR2 then
-			-- Gamepad: trigger fires / claws depending on role
-			if state.role == "ZOMBIE" then
-				actions.melee()
-			else
-				actions.fire()
-			end
 		elseif input.KeyCode == Enum.KeyCode.ButtonL1 then
 			if state.role == "PATIENT_ZERO" then
 				actions.throwKnife()
