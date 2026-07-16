@@ -129,4 +129,16 @@ function tests.active_round_survives_player_leaving()
 	assert(m.state == "ACTIVE")
 end
 
+function tests.force_end_only_when_active()
+	local m = RoundMachine.new(CONFIG)
+	assert(#m:forceEnd("SURVIVORS", 0) == 0, "no force end while waiting")
+	m:setPlayerCount(5, 0)
+	assert(#m:forceEnd("SURVIVORS", 1) == 0, "no force end during intermission")
+	m:tick(25)
+	local fx = m:forceEnd("SURVIVORS", 30)
+	assert(#fx == 1 and fx[1].type == "EndRound" and fx[1].winner == "SURVIVORS")
+	assert(m.state == "ROUND_END")
+	assert(#m:forceEnd("INFECTED", 31) == 0, "cannot force end twice")
+end
+
 return tests
