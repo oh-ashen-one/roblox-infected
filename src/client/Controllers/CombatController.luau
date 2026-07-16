@@ -78,8 +78,51 @@ local function drawTracer(origin: Vector3, direction: Vector3, range: number)
 end
 
 function CombatController.start(remotes: any)
+	local actions = {}
+
+	function actions.fire()
+		local origin, direction = myOriginAndDirection()
+		if origin == nil or direction == nil then
+			return
+		end
+		if state.role == "SURVIVOR" or state.role == "PATIENT_ZERO" then
+			local spec = (GameConfig.Combat.Guns :: any)[state.primary]
+			drawTracer(origin, direction, spec.Range)
+			remotes.fire("FireWeapon", { origin = origin, direction = direction, weaponId = state.primary })
+		end
+	end
+
+	function actions.throwKnife()
+		local origin, direction = myOriginAndDirection()
+		if origin and direction and state.role == "PATIENT_ZERO" then
+			remotes.fire("ThrowKnife", { origin = origin, direction = direction })
+		end
+	end
+
+	function actions.melee()
+		local target = nearestSurvivorTarget(GameConfig.Combat.Zombie.MeleeRange)
+		if target then
+			remotes.fire("MeleeAttack", { targetUserId = target })
+		end
+	end
+
+	function actions.reload()
+		remotes.fire("Reload", { weaponId = state.primary })
+	end
+
+	function actions.setSprint(on: boolean)
+		state.sprinting = on
+		remotes.fire("SprintState", { sprinting = on and "on" or "off" })
+	end
+
 	remotes.on("RoleAssigned", function(payload)
 		state.role = payload.role
+	end)
+
+	remotes.on("ProfileSync", function(profile)
+		if profile.loadout and profile.loadout.primary then
+			state.primary = profile.loadout.primary
+		end
 	end)
 
 	remotes.on("ShotFired", function(payload)
@@ -94,48 +137,29 @@ function CombatController.start(remotes: any)
 		end
 
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			local origin, direction = myOriginAndDirection()
-			if origin == nil or direction == nil then
-				return
-			end
-			if state.role == "SURVIVOR" or state.role == "PATIENT_ZERO" then
-				local spec = (GameConfig.Combat.Guns :: any)[state.primary]
-				drawTracer(origin, direction, spec.Range)
-				remotes.fire(
-					"FireWeapon",
-					{ origin = origin, direction = direction, weaponId = state.primary }
-				)
-			end
 			if state.role == "ZOMBIE" then
-				local target = nearestSurvivorTarget(GameConfig.Combat.Zombie.MeleeRange)
-				if target then
-					remotes.fire("MeleeAttack", { targetUserId = target })
-				end
+				actions.melee()
+			else
+				actions.fire()
 			end
 		elseif input.KeyCode == Enum.KeyCode.F and state.role == "PATIENT_ZERO" then
-			local origin, direction = myOriginAndDirection()
-			if origin and direction then
-				remotes.fire("ThrowKnife", { origin = origin, direction = direction })
-			end
+			actions.throwKnife()
 		elseif input.KeyCode == Enum.KeyCode.E and state.role == "PATIENT_ZERO" then
-			local target = nearestSurvivorTarget(GameConfig.Combat.Zombie.MeleeRange)
-			if target then
-				remotes.fire("MeleeAttack", { targetUserId = target })
-			end
+			actions.melee()
 		elseif input.KeyCode == Enum.KeyCode.R then
-			remotes.fire("Reload", { weaponId = state.primary })
+			actions.reload()
 		elseif input.KeyCode == Enum.KeyCode.LeftShift then
-			state.sprinting = true
-			remotes.fire("SprintState", { sprinting = "on" })
+			actions.setSprint(true)
 		end
 	end)
 
 	UserInputService.InputEnded:Connect(function(input)
 		if input.KeyCode == Enum.KeyCode.LeftShift and state.sprinting then
-			state.sprinting = false
-			remotes.fire("SprintState", { sprinting = "off" })
+			actions.setSprint(false)
 		end
 	end)
+
+	return actions
 end
 
 return CombatController

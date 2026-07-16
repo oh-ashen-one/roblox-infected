@@ -1,25 +1,29 @@
 --!strict
--- Client bootstrap. Phase 1: just subscribe to round state and log it.
--- Later phases add input controllers, weapon viewmodels, and UI.
+-- Client bootstrap: combat input + all UI modules.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared.Remotes)
 
+local CombatController = require(script.Controllers.CombatController)
+local HUD = require(script.UI.HUD)
+local RoleCard = require(script.UI.RoleCard)
+local RevealScreen = require(script.UI.RevealScreen)
+local MapVote = require(script.UI.MapVote)
+local Shop = require(script.UI.Shop)
+local Pings = require(script.UI.Pings)
+local Touch = require(script.UI.Touch)
+
 local remotes = Remotes.client()
 
-local CombatController = require(script.Controllers.CombatController)
-CombatController.start(remotes)
-
-remotes.on("RoundState", function(state)
-	print(
-		("[INFECTED] Round state: %s (players=%d, survivors=%d)"):format(
-			tostring(state.state),
-			tonumber(state.playerCount) or 0,
-			tonumber(state.survivorCount) or 0
-		)
-	)
-end)
+local actions = CombatController.start(remotes)
+HUD.start(remotes)
+RoleCard.start(remotes)
+RevealScreen.start(remotes)
+MapVote.start(remotes)
+Shop.start(remotes)
+Pings.start(remotes)
+Touch.start(remotes, actions)
 
 print("[INFECTED] Client booted")

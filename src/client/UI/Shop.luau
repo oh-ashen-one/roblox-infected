@@ -1,0 +1,248 @@
+--!strict
+-- Shop panel (intermission): loadout picker, crate opening with card-flip reveal,
+-- owned-skin list with equip buttons. Toggled with the SHOP button / B key.
+
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local GameConfig = require(Shared.GameConfig)
+local SkinCatalog = require(Shared.SkinCatalog)
+
+local Theme = require(script.Parent.Theme)
+
+local Shop = {}
+
+local function skinById(id: string)
+	for _, skin in SkinCatalog do
+		if skin.id == id then
+			return skin
+		end
+	end
+	return nil
+end
+
+local function rarityColor(rarityName: string): Color3
+	for _, rarity in GameConfig.Economy.Rarities do
+		if rarity.name == rarityName then
+			return Color3.fromRGB(rarity.color[1], rarity.color[2], rarity.color[3])
+		end
+	end
+	return Theme.Colors.Text
+end
+
+function Shop.start(remotes: any)
+	local gui = Theme.screenGui("Shop", 4)
+	local profile: any = nil
+
+	-- Toggle button
+	local toggle = Theme.button(gui, {
+		Size = UDim2.new(0, 90, 0, 36),
+		Position = UDim2.new(0, 12, 0, 64),
+		Text = "SHOP  [B]",
+		TextSize = 14,
+	})
+
+	local panel = Theme.frame(gui, {
+		Size = UDim2.new(0, 620, 0, 420),
+		Position = UDim2.new(0.5, -310, 0.5, -210),
+		BackgroundTransparency = 0.05,
+		Visible = false,
+	})
+	Theme.corner(panel, 14)
+
+	Theme.label(panel, {
+		Size = UDim2.new(1, 0, 0, 34),
+		Position = UDim2.new(0, 0, 0, 8),
+		Text = "SHOP & LOADOUT",
+		TextSize = 20,
+	})
+	local close = Theme.button(panel, {
+		Size = UDim2.new(0, 32, 0, 32),
+		Position = UDim2.new(1, -40, 0, 8),
+		Text = "X",
+	})
+
+	-- Loadout picker
+	Theme.label(panel, {
+		Size = UDim2.new(0, 200, 0, 20),
+		Position = UDim2.new(0, 16, 0, 48),
+		Text = "PRIMARY WEAPON",
+		TextSize = 13,
+		TextColor3 = Theme.Colors.TextDim,
+		TextXAlignment = Enum.TextXAlignment.Left,
+	})
+	local loadoutButtons = {}
+	for i, weaponId in { "AssaultRifle", "Shotgun", "SMG" } do
+		local button = Theme.button(panel, {
+			Size = UDim2.new(0, 120, 0, 34),
+			Position = UDim2.new(0, 16 + (i - 1) * 128, 0, 70),
+			Text = weaponId,
+			TextSize = 14,
+		})
+		button.MouseButton1Click:Connect(function()
+			remotes.fire("SelectLoadout", { primary = weaponId })
+		end)
+		loadoutButtons[weaponId] = button
+	end
+
+	-- Crate section
+	Theme.label(panel, {
+		Size = UDim2.new(0, 300, 0, 20),
+		Position = UDim2.new(0, 16, 0, 116),
+		Text = ("CRATE — %d COINS"):format(GameConfig.Economy.CrateCostCoins),
+		TextSize = 13,
+		TextColor3 = Theme.Colors.TextDim,
+		TextXAlignment = Enum.TextXAlignment.Left,
+	})
+	local buyCrate = Theme.button(panel, {
+		Size = UDim2.new(0, 150, 0, 36),
+		Position = UDim2.new(0, 16, 0, 138),
+		Text = "OPEN CRATE",
+		TextSize = 15,
+		BackgroundColor3 = Theme.Colors.Gold,
+		TextColor3 = Theme.Colors.Bg,
+	})
+	buyCrate.MouseButton1Click:Connect(function()
+		remotes.fire("BuyCrate", { currency = "Coins" })
+	end)
+
+	-- Card-flip result row
+	local cards = {}
+	for i = 1, 3 do
+		local card = Theme.frame(panel, {
+			Size = UDim2.new(0, 120, 0, 70),
+			Position = UDim2.new(0, 200 + (i - 1) * 130, 0, 122),
+			BackgroundColor3 = Theme.Colors.PanelLight,
+			Visible = false,
+		})
+		Theme.corner(card, 10)
+		local nameLabel = Theme.label(card, {
+			Size = UDim2.new(1, -8, 0, 40),
+			Position = UDim2.new(0, 4, 0, 4),
+			Text = "?",
+			TextSize = 14,
+			TextWrapped = true,
+		})
+		local tag = Theme.label(card, {
+			Size = UDim2.new(1, 0, 0, 18),
+			Position = UDim2.new(0, 0, 1, -22),
+			Text = "",
+			TextSize = 11,
+			TextColor3 = Theme.Colors.TextDim,
+		})
+		cards[i] = { frame = card, name = nameLabel, tag = tag }
+	end
+
+	-- Owned skins list
+	Theme.label(panel, {
+		Size = UDim2.new(0, 300, 0, 20),
+		Position = UDim2.new(0, 16, 0, 210),
+		Text = "YOUR SKINS",
+		TextSize = 13,
+		TextColor3 = Theme.Colors.TextDim,
+		TextXAlignment = Enum.TextXAlignment.Left,
+	})
+	local list = Instance.new("ScrollingFrame")
+	list.Size = UDim2.new(1, -32, 0, 170)
+	list.Position = UDim2.new(0, 16, 0, 232)
+	list.BackgroundTransparency = 1
+	list.BorderSizePixel = 0
+	list.ScrollBarThickness = 6
+	list.CanvasSize = UDim2.new(0, 0, 0, 0)
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.Parent = panel
+	local listLayout = Instance.new("UIGridLayout")
+	listLayout.CellSize = UDim2.new(0, 136, 0, 44)
+	listLayout.CellPadding = UDim2.new(0, 8, 0, 8)
+	listLayout.Parent = list
+
+	local function refreshSkins()
+		for _, child in list:GetChildren() do
+			if child:IsA("TextButton") then
+				child:Destroy()
+			end
+		end
+		if profile == nil then
+			return
+		end
+		for _, skin in SkinCatalog do
+			if profile.ownedSkins and profile.ownedSkins[skin.id] then
+				local equipped = profile.equipped and (profile.equipped[skin.slot] == skin.id)
+				local button = Theme.button(list, {
+					Size = UDim2.new(0, 136, 0, 44),
+					Text = (equipped and "✓ " or "") .. skin.name,
+					TextSize = 13,
+					BackgroundColor3 = equipped and Theme.Colors.Survivor or Theme.Colors.PanelLight,
+				})
+				local stripe = Instance.new("Frame")
+				stripe.Size = UDim2.new(0, 4, 1, 0)
+				stripe.BorderSizePixel = 0
+				stripe.BackgroundColor3 = rarityColor(skin.rarity)
+				stripe.Parent = button
+				button.MouseButton1Click:Connect(function()
+					remotes.fire("EquipSkin", { skinId = skin.id })
+				end)
+			end
+		end
+	end
+
+	local function refreshLoadout()
+		if profile == nil then
+			return
+		end
+		for weaponId, button in loadoutButtons do
+			button.BackgroundColor3 = if profile.loadout and profile.loadout.primary == weaponId
+				then Theme.Colors.Survivor
+				else Theme.Colors.PanelLight
+		end
+	end
+
+	remotes.on("ProfileSync", function(data)
+		profile = data
+		refreshSkins()
+		refreshLoadout()
+	end)
+
+	remotes.on("CrateResult", function(result)
+		local winner = skinById(result.winner)
+		local decoys = result.decoys or {}
+		for i, card in cards do
+			card.frame.Visible = true
+			if i == 1 and winner then
+				card.name.Text = winner.name
+				card.name.TextColor3 = rarityColor(winner.rarity)
+				card.tag.Text = result.duplicate and "DUPLICATE (+coins)" or "WON — " .. winner.rarity
+			else
+				local decoy = skinById(decoys[i - 1] or "")
+				card.name.Text = decoy and decoy.name or "?"
+				card.name.TextColor3 = decoy and rarityColor(decoy.rarity) or Theme.Colors.TextDim
+				card.tag.Text = "missed"
+			end
+		end
+		task.delay(6, function()
+			for _, card in cards do
+				card.frame.Visible = false
+			end
+		end)
+	end)
+
+	local function setOpen(open: boolean)
+		panel.Visible = open
+	end
+	toggle.MouseButton1Click:Connect(function()
+		setOpen(not panel.Visible)
+	end)
+	close.MouseButton1Click:Connect(function()
+		setOpen(false)
+	end)
+	UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		if not gameProcessed and input.KeyCode == Enum.KeyCode.B then
+			setOpen(not panel.Visible)
+		end
+	end)
+
+	return {}
+end
+
+return Shop
