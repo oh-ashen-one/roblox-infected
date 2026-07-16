@@ -146,15 +146,31 @@ function CombatController.start(remotes: any)
 			actions.throwKnife()
 		elseif input.KeyCode == Enum.KeyCode.E and state.role == "PATIENT_ZERO" then
 			actions.melee()
-		elseif input.KeyCode == Enum.KeyCode.R then
+		elseif input.KeyCode == Enum.KeyCode.R or input.KeyCode == Enum.KeyCode.ButtonX then
 			actions.reload()
-		elseif input.KeyCode == Enum.KeyCode.LeftShift then
+		elseif input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then
 			actions.setSprint(true)
+		elseif input.KeyCode == Enum.KeyCode.ButtonR2 then
+			-- Gamepad: trigger fires / claws depending on role
+			if state.role == "ZOMBIE" then
+				actions.melee()
+			else
+				actions.fire()
+			end
+		elseif input.KeyCode == Enum.KeyCode.ButtonL1 then
+			if state.role == "PATIENT_ZERO" then
+				actions.throwKnife()
+			else
+				actions.melee()
+			end
 		end
 	end)
 
 	UserInputService.InputEnded:Connect(function(input)
-		if input.KeyCode == Enum.KeyCode.LeftShift and state.sprinting then
+		if
+			(input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3)
+			and state.sprinting
+		then
 			actions.setSprint(false)
 		end
 	end)

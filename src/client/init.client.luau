@@ -14,6 +14,8 @@ local MapVote = require(script.UI.MapVote)
 local Shop = require(script.UI.Shop)
 local Pings = require(script.UI.Pings)
 local Touch = require(script.UI.Touch)
+local Effects = require(script.UI.Effects)
+local Settings = require(script.UI.Settings)
 
 local remotes = Remotes.client()
 
@@ -25,5 +27,7 @@ MapVote.start(remotes)
 Shop.start(remotes)
 Pings.start(remotes)
 Touch.start(remotes, actions)
+Effects.start(remotes)
+Settings.start()
 
 print("[INFECTED] Client booted")
