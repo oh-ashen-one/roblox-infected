@@ -31,6 +31,7 @@ export type RoundMachine = {
 	conversions: number,
 
 	setPlayerCount: (self: RoundMachine, n: number, now: number) -> { Effect },
+	forceEnd: (self: RoundMachine, winner: "SURVIVORS" | "INFECTED" | "NOBODY", now: number) -> { Effect },
 	setSurvivorCount: (self: RoundMachine, n: number, now: number) -> { Effect },
 	recordConversion: (self: RoundMachine, now: number) -> { Effect },
 	tick: (self: RoundMachine, now: number) -> { Effect },
@@ -85,6 +86,14 @@ function RoundMachine.setSurvivorCount(self, n: number, now: number): { Effect }
 		table.insert(effects, enterRoundEnd(self, now, "INFECTED"))
 	end
 	return effects
+end
+
+-- Immediate round end regardless of counts (e.g. Patient Zero left before first blood).
+function RoundMachine.forceEnd(self, winner: "SURVIVORS" | "INFECTED" | "NOBODY", now: number): { Effect }
+	if self.state ~= "ACTIVE" then
+		return {}
+	end
+	return { enterRoundEnd(self, now, winner) }
 end
 
 function RoundMachine.recordConversion(self, _now: number): { Effect }

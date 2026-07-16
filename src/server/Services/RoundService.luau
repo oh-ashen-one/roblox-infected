@@ -41,6 +41,10 @@ function RoundService:recordConversion()
 	self:_execute(self._machine:recordConversion(os.clock()))
 end
 
+function RoundService:forceEnd(winner: string)
+	self:_execute(self._machine:forceEnd(winner :: any, os.clock()))
+end
+
 function RoundService:setSurvivorCount(n: number)
 	self:_execute(self._machine:setSurvivorCount(n, os.clock()))
 end
