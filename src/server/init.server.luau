@@ -3,10 +3,21 @@
 -- then services, wired together here so each service stays decoupled.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared.GameConfig)
 local Remotes = require(Shared.Remotes)
+
+local RoundService = require(script.Services.RoundService)
+local RoleService = require(script.Services.RoleService)
+local CombatService = require(script.Services.CombatService)
+local AntiCheatService = require(script.Services.AntiCheatService)
+local MapService = require(script.Services.MapService)
+local DataService = require(script.Services.DataService)
+local EconomyService = require(script.Services.EconomyService)
+local MonetizationService = require(script.Services.MonetizationService)
+local EndgameService = require(script.Services.EndgameService)
 
 -- Fast timers in Studio so a full round loop plays out in under a minute of testing.
 if game:GetService("RunService"):IsStudio() then
@@ -16,11 +27,6 @@ if game:GetService("RunService"):IsStudio() then
 	GameConfig.Round.RevealSeconds = 6
 	GameConfig.Round.MinPlayersToStart = 2
 end
-local RoundService = require(script.Services.RoundService)
-local RoleService = require(script.Services.RoleService)
-local CombatService = require(script.Services.CombatService)
-local AntiCheatService = require(script.Services.AntiCheatService)
-local MapService = require(script.Services.MapService)
 
 local remotes = Remotes.server()
 
@@ -28,17 +34,22 @@ local roundService
 local roleService
 
 local mapService = MapService.new({ remotes = remotes })
+local dataService = DataService.new({ remotes = remotes })
+local economyService = EconomyService.new({ remotes = remotes, dataService = dataService })
+local monetizationService =
+	MonetizationService.new({ dataService = dataService, economyService = economyService })
 
 roleService = RoleService.new({
+	remotes = remotes,
 	getSurvivorSpawn = function()
 		return mapService:randomSurvivorSpawn()
 	end,
 	getZombieSpawn = function(survivorRoots)
 		return mapService:zombieSpawnNearAction(survivorRoots)
 	end,
-	remotes = remotes,
 	onConversion = function(victim: Player, killer: Player?)
 		roundService:recordConversion()
+		economyService:onConversion(killer)
 		remotes.fireAllClients("ConversionAlert", {
 			victimName = victim.DisplayName,
 			killerName = killer and killer.DisplayName or nil,
@@ -53,28 +64,11 @@ roleService = RoleService.new({
 	end,
 })
 
-roundService = RoundService.new({
+local endgameService = EndgameService.new({
 	remotes = remotes,
-	onRoundStart = function(playersInRound)
-		mapService:loadVotedMap()
-		roleService:assignRoles(playersInRound)
-	end,
-	onRoundEnd = function(winner)
-		local originalPZ = roleService:getOriginalPatientZero()
-		local survivorNames = {}
-		for _, survivor in roleService:survivors() do
-			table.insert(survivorNames, survivor.DisplayName)
-		end
-		remotes.fireAllClients("RevealScreen", {
-			winner = winner,
-			patientZeroName = originalPZ and originalPZ.name or "?",
-			survivors = survivorNames,
-		})
-		roleService:endRound()
-	end,
-	onIntermission = function()
-		mapService:unload()
-		mapService:openVote()
+	roleService = roleService,
+	isRoundActive = function()
+		return roundService ~= nil and roundService:getState() == "ACTIVE"
 	end,
 })
 
@@ -84,8 +78,15 @@ local combatService = CombatService.new({
 	isRoundActive = function()
 		return roundService:getState() == "ACTIVE"
 	end,
-	onZombieKilled = function(_killer: Player, _victim: Player)
-		-- EconomyService hooks in here in Phase 5
+	onZombieKilled = function(killer: Player, _victim: Player)
+		economyService:onZombieKilled(killer)
+	end,
+	isLastStand = function(player: Player)
+		return endgameService:isLastStand(player)
+	end,
+	getPrimary = function(player: Player)
+		local data = dataService:get(player)
+		return data and data.loadout.primary or "AssaultRifle"
 	end,
 })
 
@@ -94,11 +95,50 @@ local antiCheatService = AntiCheatService.new({
 	combatService = combatService,
 })
 
+roundService = RoundService.new({
+	remotes = remotes,
+	onRoundStart = function(playersInRound)
+		economyService:resetRound()
+		combatService:resetRound()
+		endgameService:resetRound()
+		mapService:loadVotedMap()
+		roleService:assignRoles(playersInRound)
+	end,
+	onRoundEnd = function(winner)
+		local originalPZ = roleService:getOriginalPatientZero()
+		local survivors = roleService:survivors()
+		local survivorNames = {}
+		for _, survivor in survivors do
+			table.insert(survivorNames, survivor.DisplayName)
+		end
+		economyService:onRoundEnd(winner, survivors, Players:GetPlayers())
+		local earnings = {}
+		for player, coins in economyService:roundEarnings() do
+			earnings[tostring(player.UserId)] = coins
+		end
+		remotes.fireAllClients("RevealScreen", {
+			winner = winner,
+			patientZeroName = originalPZ and originalPZ.name or "?",
+			survivors = survivorNames,
+			earnings = earnings,
+		})
+		roleService:endRound()
+	end,
+	onIntermission = function()
+		mapService:unload()
+		mapService:openVote()
+	end,
+})
+
+dataService:start()
 roleService:start()
 roundService:start()
 combatService:start()
 antiCheatService:start()
 mapService:start()
+economyService:start()
+monetizationService:start()
+endgameService:start()
 
 -- Studio-only smoke test: exercises the whole round loop with fast timers and
 -- scripted deaths so a local multi-client playtest verifies itself in the Output.

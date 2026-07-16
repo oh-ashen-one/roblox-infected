@@ -211,6 +211,79 @@ function RoleService:convert(victim: Player, killer: Player?)
 	end)
 end
 
+function RoleService:_hordeFraction(): number
+	local total, infected = 0, 0
+	for _, role in self._roles do
+		total += 1
+		if role == "ZOMBIE" or role == "PATIENT_ZERO" then
+			infected += 1
+		end
+	end
+	if total == 0 then
+		return 0
+	end
+	return infected / total
+end
+
+function RoleService:_pickZombieClass(): GameConfig.ZombieClass
+	local fraction = self:_hordeFraction()
+	local unlocked = {}
+	for _, class in GameConfig.ZombieClasses do
+		if fraction >= class.hordeThreshold then
+			table.insert(unlocked, class)
+		end
+	end
+	return unlocked[rng:NextInteger(1, math.max(1, #unlocked))] or GameConfig.ZombieClasses[1]
+end
+
+function RoleService:_applyZombieClass(player: Player, character: Model, class: GameConfig.ZombieClass)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.MaxHealth = class.maxHealth
+		humanoid.Health = class.maxHealth
+		humanoid.WalkSpeed = GameConfig.Movement.BaseWalkSpeed * class.walkSpeedMult
+	end
+	character:SetAttribute("ZombieClass", class.name)
+	self._deps.remotes.fireClient("HordeUpdate", player, { yourClass = class.name })
+
+	if class.ability == "scream" and class.abilityCooldown then
+		-- Screamer: pulses survivor positions to the whole horde while alive
+		task.spawn(function()
+			while
+				self._roundActive
+				and self._roles[player] == "ZOMBIE"
+				and player.Character == character
+				and humanoid
+				and humanoid.Health > 0
+			do
+				task.wait(class.abilityCooldown)
+				if self._roundActive and player.Character == character and humanoid.Health > 0 then
+					local positions = {}
+					for _, survivor in self:survivors() do
+						local sRoot = survivor.Character
+							and survivor.Character:FindFirstChild("HumanoidRootPart")
+						if sRoot and sRoot:IsA("BasePart") then
+							table.insert(positions, {
+								userId = survivor.UserId,
+								name = survivor.DisplayName,
+								x = sRoot.Position.X,
+								y = sRoot.Position.Y,
+								z = sRoot.Position.Z,
+							})
+						end
+					end
+					if #positions > 0 then
+						self._deps.remotes.fireAllClients(
+							"SurvivorPing",
+							{ survivors = positions, scream = true }
+						)
+					end
+				end
+			end
+		end)
+	end
+end
+
 function RoleService:_spawnAsZombie(player: Player)
 	player:LoadCharacter()
 	local character = player.Character or player.CharacterAdded:Wait()
@@ -230,6 +303,7 @@ function RoleService:_spawnAsZombie(player: Player)
 		end
 	end
 	applyZombieAppearance(character)
+	self:_applyZombieClass(player, character, self:_pickZombieClass())
 	applySpawnProtection(character)
 	self:_watchCharacter(player, character)
 end

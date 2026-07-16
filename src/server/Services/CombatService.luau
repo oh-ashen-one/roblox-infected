@@ -23,6 +23,8 @@ export type Deps = {
 	roleService: any,
 	isRoundActive: () -> boolean,
 	onZombieKilled: (killer: Player, victim: Player) -> (), -- rewards
+	isLastStand: ((player: Player) -> boolean)?, -- damage resist + Minigun access
+	getPrimary: ((player: Player) -> string)?, -- selected loadout (nil -> allow all)
 }
 
 -- Claimed fire origin may be at most this far from the character's actual head
@@ -132,6 +134,22 @@ function CombatService:handleFireWeapon(
 	if role ~= "SURVIVOR" and role ~= "PATIENT_ZERO" then
 		self:_flag(player)
 		return
+	end
+
+	-- Weapon must be in the player's loadout: selected primary, the Pistol sidearm,
+	-- or the Minigun during Last Stand.
+	if self._deps.getPrimary then
+		local allowed = payload.weaponId == self._deps.getPrimary(player)
+			or payload.weaponId == "Pistol"
+			or (
+				payload.weaponId == "Minigun"
+				and self._deps.isLastStand ~= nil
+				and self._deps.isLastStand(player)
+			)
+		if not allowed then
+			self:_flag(player)
+			return
+		end
 	end
 
 	local spec = (GameConfig.Combat.Guns :: any)[payload.weaponId]
@@ -317,7 +335,11 @@ function CombatService:_simulateKnife(
 					then
 						tagKiller(victim, thrower)
 						local vh = victimHumanoid :: Humanoid
-						vh:TakeDamage(vh.MaxHealth)
+						local damage = vh.MaxHealth
+						if self._deps.isLastStand and self._deps.isLastStand(victim) then
+							damage *= GameConfig.Combat.LastStand.DamageResistMult
+						end
+						vh:TakeDamage(damage)
 					end
 				end
 				return -- knife stops on any hit
@@ -374,13 +396,12 @@ function CombatService:handleMelee(player: Player, payload: { targetUserId: numb
 	self._lastMelee[player] = now
 
 	tagKiller(target, player)
-	if role == "PATIENT_ZERO" then
-		local th = targetHumanoid :: Humanoid
-		th:TakeDamage(th.MaxHealth)
-	else
-		local th = targetHumanoid :: Humanoid
-		th:TakeDamage(GameConfig.Combat.Zombie.MeleeDamage)
+	local th = targetHumanoid :: Humanoid
+	local damage = if role == "PATIENT_ZERO" then th.MaxHealth else GameConfig.Combat.Zombie.MeleeDamage
+	if self._deps.isLastStand and self._deps.isLastStand(target) then
+		damage *= GameConfig.Combat.LastStand.DamageResistMult
 	end
+	th:TakeDamage(damage)
 end
 
 -- Sprint -------------------------------------------------------------------------
