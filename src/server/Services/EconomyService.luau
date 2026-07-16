@@ -35,21 +35,34 @@ function EconomyService.new(deps: Deps)
 	return self
 end
 
-function EconomyService:_ownsGamePass(player: Player, passId: number): boolean
-	if passId == 0 then
-		return false -- not created yet
-	end
+-- Gamepass ownership is prefetched on join so award() never yields on a web call
+-- mid-round (a yield inside the conversion path can flip round winners —
+-- finding #3). Only successful lookups are cached, so a transient API failure
+-- doesn't strip a paying player's multiplier for the session (finding #8).
+function EconomyService:_prefetchGamePasses(player: Player)
 	local cache = self._gamepassCache[player]
 	if cache == nil then
 		cache = {}
 		self._gamepassCache[player] = cache
 	end
-	if cache[passId] == nil then
-		local ok, owns =
-			pcall(MarketplaceService.UserOwnsGamePassAsync, MarketplaceService, player.UserId, passId)
-		cache[passId] = ok and owns or false
+	for _, passId in GameConfig.Products.GamePasses :: any do
+		if passId ~= 0 and cache[passId] == nil then
+			local ok, owns =
+				pcall(MarketplaceService.UserOwnsGamePassAsync, MarketplaceService, player.UserId, passId)
+			if ok then
+				cache[passId] = owns
+			end
+		end
 	end
-	return cache[passId] :: boolean
+end
+
+function EconomyService:_ownsGamePass(player: Player, passId: number): boolean
+	if passId == 0 then
+		return false -- not created yet
+	end
+	local cache = self._gamepassCache[player]
+	-- Cache read only — never yields; nil (prefetch pending/failed) = not owned yet
+	return cache ~= nil and cache[passId] == true
 end
 
 function EconomyService:resetRound()
@@ -204,6 +217,16 @@ end
 
 function EconomyService:start()
 	local remotes = self._deps.remotes
+	Players.PlayerAdded:Connect(function(player)
+		task.spawn(function()
+			self:_prefetchGamePasses(player)
+		end)
+	end)
+	for _, player in Players:GetPlayers() do
+		task.spawn(function()
+			self:_prefetchGamePasses(player)
+		end)
+	end
 	remotes.onValidated("BuyCrate", function(player, _payload)
 		self:openCrate(player, false)
 	end)

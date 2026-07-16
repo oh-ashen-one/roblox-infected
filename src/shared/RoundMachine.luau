@@ -119,7 +119,10 @@ function RoundMachine.tick(self, now: number): { Effect }
 			self.state = "ACTIVE"
 			self.roundStartedAt = now
 			self.conversions = 0
-			self.survivorCount = self.playerCount
+			-- One player is Patient Zero, not a survivor. RoleService reports the
+			-- authoritative count after spawning, but that loop yields — this keeps
+			-- the interim value correct (finding #5).
+			self.survivorCount = math.max(self.playerCount - 1, 0)
 			self.deadline = now + self.config.BaseRoundSeconds
 			return { { type = "StartRound", endsAt = self.deadline :: number } }
 		else

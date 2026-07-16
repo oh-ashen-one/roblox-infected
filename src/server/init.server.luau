@@ -36,8 +36,10 @@ end
 
 local remotes = Remotes.server()
 
+-- Forward declarations: service closures below reference these before assignment
 local roundService
 local roleService
+local endgameService
 
 local mapService = MapService.new({ remotes = remotes })
 local dataService = DataService.new({ remotes = remotes })
@@ -67,6 +69,7 @@ roleService = RoleService.new({
 	end,
 	onSurvivorCountChanged = function(count: number)
 		roundService:setSurvivorCount(count)
+		endgameService:onSurvivorCountChanged(count)
 	end,
 	onPatientZeroGone = function()
 		-- PZ left before creating any zombies: survivors win by default
@@ -74,7 +77,7 @@ roleService = RoleService.new({
 	end,
 })
 
-local endgameService = EndgameService.new({
+endgameService = EndgameService.new({
 	remotes = remotes,
 	roleService = roleService,
 	isRoundActive = function()

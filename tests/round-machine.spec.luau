@@ -56,7 +56,7 @@ function tests.starts_round_when_intermission_expires()
 	assert(effectTypes(fx) == "StartRound", effectTypes(fx))
 	assert(m.state == "ACTIVE")
 	assert(m.deadline == 325, "round deadline = start + 300")
-	assert(m.survivorCount == 6, "all players start as survivors")
+	assert(m.survivorCount == 5, "everyone but Patient Zero starts as a survivor")
 end
 
 function tests.conversion_extends_deadline_capped()

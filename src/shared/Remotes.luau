@@ -95,7 +95,10 @@ function Remotes.server(): ServerApi
 		instances[name] = remote
 	end
 
-	local buckets: { [Player]: { [string]: { count: number, windowStart: number } } } = {}
+	-- Token bucket per player+remote: refills continuously at ratePerSecond with a
+	-- burst cap of one second's worth. A fixed window would allow 2x bursts across
+	-- the window boundary.
+	local buckets: { [Player]: { [string]: { tokens: number, last: number } } } = {}
 	local violations: { [Player]: number } = {}
 
 	game:GetService("Players").PlayerRemoving:Connect(function(player)
@@ -115,7 +118,8 @@ function Remotes.server(): ServerApi
 		assert(spec.ratePerSecond ~= nil, name .. " is not a client->server remote")
 		local remote = instances[name]
 		return remote.OnServerEvent:Connect(function(player, payload)
-			-- Rate limit (fixed 1s window)
+			-- Rate limit (token bucket)
+			local rate = spec.ratePerSecond :: number
 			local now = os.clock()
 			local playerBuckets = buckets[player]
 			if playerBuckets == nil then
@@ -123,15 +127,17 @@ function Remotes.server(): ServerApi
 				buckets[player] = playerBuckets
 			end
 			local bucket = playerBuckets[name]
-			if bucket == nil or now - bucket.windowStart >= 1 then
-				bucket = { count = 0, windowStart = now }
+			if bucket == nil then
+				bucket = { tokens = rate, last = now }
 				playerBuckets[name] = bucket
 			end
-			bucket.count += 1
-			if bucket.count > (spec.ratePerSecond :: number) then
+			bucket.tokens = math.min(rate, bucket.tokens + (now - bucket.last) * rate)
+			bucket.last = now
+			if bucket.tokens < 1 then
 				flag(player)
 				return
 			end
+			bucket.tokens -= 1
 			-- Payload validation
 			if spec.validator ~= nil then
 				if not (spec.validator :: Validators.Validator)(payload) then

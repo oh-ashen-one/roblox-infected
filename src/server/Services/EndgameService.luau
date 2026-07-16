@@ -35,6 +35,31 @@ function EndgameService:resetRound()
 	self._lastStandAnnounced = false
 end
 
+-- Event-driven Last Stand: called whenever the survivor count changes so the buff
+-- applies the moment the second-to-last survivor falls, not at the next 15s poll
+-- (finding #11). The poll loop below only handles pings.
+function EndgameService:onSurvivorCountChanged(count: number)
+	if not self._deps.isRoundActive() then
+		return
+	end
+	if count == 1 then
+		local survivors = self._deps.roleService:survivors()
+		local last = survivors[1]
+		if last ~= nil and self._lastStandPlayer ~= last then
+			self._lastStandPlayer = last
+			if not self._lastStandAnnounced then
+				self._lastStandAnnounced = true
+				self._deps.remotes.fireAllClients("KillFeed", {
+					text = ("%s is the LAST SURVIVOR — take them down!"):format(last.DisplayName),
+				})
+				self._deps.remotes.fireClient("RoleAssigned", last, { role = "SURVIVOR", lastStand = true })
+			end
+		end
+	else
+		self._lastStandPlayer = nil
+	end
+end
+
 function EndgameService:_pingSurvivors()
 	local positions = {}
 	for _, survivor in self._deps.roleService:survivors() do
@@ -66,25 +91,6 @@ function EndgameService:start()
 			local survivors = self._deps.roleService:survivors()
 			if #survivors > 0 and #survivors <= GameConfig.Round.LastSurvivorsPingCount then
 				self:_pingSurvivors()
-			end
-			if #survivors == 1 then
-				local last = survivors[1]
-				if self._lastStandPlayer ~= last then
-					self._lastStandPlayer = last
-					if not self._lastStandAnnounced then
-						self._lastStandAnnounced = true
-						self._deps.remotes.fireAllClients("KillFeed", {
-							text = ("%s is the LAST SURVIVOR — take them down!"):format(last.DisplayName),
-						})
-						self._deps.remotes.fireClient(
-							"RoleAssigned",
-							last,
-							{ role = "SURVIVOR", lastStand = true }
-						)
-					end
-				end
-			elseif #survivors > 1 then
-				self._lastStandPlayer = nil
 			end
 		end
 	end)

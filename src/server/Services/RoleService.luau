@@ -82,6 +82,24 @@ local function applySpawnProtection(character: Model)
 	end)
 end
 
+-- LoadCharacter that tolerates the player leaving mid-call. Returns nil if the
+-- character never arrives (player gone) rather than yielding forever.
+function RoleService:_safeLoadCharacter(player: Player): Model?
+	local ok = pcall(function()
+		player:LoadCharacter()
+	end)
+	if not ok then
+		return nil
+	end
+	local character = player.Character
+	local waited = 0
+	while character == nil and player.Parent ~= nil and waited < 5 do
+		waited += task.wait(0.1)
+		character = player.Character
+	end
+	return character
+end
+
 -- Role queries ----------------------------------------------------------------
 
 function RoleService:getRole(player: Player): Role
@@ -128,9 +146,13 @@ function RoleService:assignRoles(playersInRound: { Player })
 	self._firstBloodDone = false
 	table.clear(self._roles)
 
-	-- age the PZ history one round
+	-- age the PZ history one round; prune entries past the window (memory: finding #10)
 	for userId, rounds in self._pzHistory do
-		self._pzHistory[userId] = rounds + 1
+		if rounds + 1 > GameConfig.Round.PatientZeroRecentRounds then
+			self._pzHistory[userId] = nil
+		else
+			self._pzHistory[userId] = rounds + 1
+		end
 	end
 
 	local candidates = {}
@@ -152,10 +174,19 @@ function RoleService:assignRoles(playersInRound: { Player })
 		end
 	end
 
-	-- Everyone (re)spawns fresh for the round
+	-- Everyone (re)spawns fresh for the round. Players can leave at ANY yield in
+	-- this loop (finding #1), so each iteration is leaver-safe and never blocks
+	-- unboundedly on a character that will never arrive.
 	for _, player in playersInRound do
-		player:LoadCharacter()
-		local character = player.Character or player.CharacterAdded:Wait()
+		if player.Parent == nil then
+			self._roles[player] = nil
+			continue
+		end
+		local character = self:_safeLoadCharacter(player)
+		if character == nil then
+			self._roles[player] = nil
+			continue
+		end
 		if self._deps.getSurvivorSpawn then
 			local spawnCFrame = self._deps.getSurvivorSpawn()
 			local root = character:WaitForChild("HumanoidRootPart", 5)
@@ -170,14 +201,15 @@ function RoleService:assignRoles(playersInRound: { Player })
 		local gunSkin = self._deps.getEquippedGunSkin and self._deps.getEquippedGunSkin(player) or nil
 		WeaponVisuals.attachGun(character, gunSkin)
 		local role = self._roles[player]
-		if role == "PATIENT_ZERO" then
-			local humanoid = character:FindFirstChildOfClass("Humanoid")
-			if humanoid then
-				humanoid.WalkSpeed = GameConfig.Movement.BaseWalkSpeed -- sprint mult applied by sprint system
-			end
-		end
 		-- Private role card — the ONLY place a client learns its role
 		self._deps.remotes.fireClient("RoleAssigned", player, { role = role })
+	end
+
+	-- The chosen PZ may have left during the spawn loop
+	if self._patientZero ~= nil and self._patientZero.Parent == nil then
+		self._roles[self._patientZero] = nil
+		self._patientZero = nil
+		self._deps.onPatientZeroGone()
 	end
 
 	self._deps.onSurvivorCountChanged(self:survivorCount())
@@ -190,6 +222,12 @@ function RoleService:endRound()
 		self:_unwatchCharacter(player)
 	end
 	table.clear(self._roles)
+	-- Fresh lobby characters (auto-loads are off; nothing else will respawn them)
+	for _, player in Players:GetPlayers() do
+		task.spawn(function()
+			self:spawnLobby(player)
+		end)
+	end
 end
 
 -- Conversion ------------------------------------------------------------------
@@ -204,9 +242,12 @@ function RoleService:convert(victim: Player, killer: Player?)
 	end
 	self._roles[victim] = "ZOMBIE"
 
-	self._deps.onConversion(victim, killer)
-	self._deps.remotes.fireClient("RoleAssigned", victim, { role = "ZOMBIE" })
+	-- Survivor count reaches the round machine BEFORE any reward hooks: onConversion
+	-- can yield on web calls, and a stale count during that yield can flip the
+	-- winner at timer expiry (finding #3).
 	self._deps.onSurvivorCountChanged(self:survivorCount())
+	self._deps.remotes.fireClient("RoleAssigned", victim, { role = "ZOMBIE" })
+	self._deps.onConversion(victim, killer)
 
 	-- Respawn as zombie after a beat
 	task.delay(GameConfig.Round.ZombieRespawnSeconds, function()
@@ -290,8 +331,10 @@ function RoleService:_applyZombieClass(player: Player, character: Model, class: 
 end
 
 function RoleService:_spawnAsZombie(player: Player)
-	player:LoadCharacter()
-	local character = player.Character or player.CharacterAdded:Wait()
+	local character = self:_safeLoadCharacter(player)
+	if character == nil then
+		return -- player left mid-respawn
+	end
 	if self._deps.getZombieSpawn then
 		local survivorRoots = {}
 		for _, survivor in self:survivors() do
@@ -375,7 +418,42 @@ function RoleService:_onDied(player: Player)
 	end
 end
 
+-- Lobby characters: CharacterAutoLoads is off (engine auto-respawn races the
+-- zombie respawn flow — finding #2), so anyone outside a round is spawned and
+-- re-spawned here.
+function RoleService:spawnLobby(player: Player)
+	if self._roundActive and self._roles[player] ~= nil then
+		return
+	end
+	local character = self:_safeLoadCharacter(player)
+	if character == nil then
+		return
+	end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.Died:Once(function()
+			task.delay(GameConfig.Round.ZombieRespawnSeconds, function()
+				if player.Parent ~= nil and not (self._roundActive and self._roles[player] ~= nil) then
+					self:spawnLobby(player)
+				end
+			end)
+		end)
+	end
+end
+
+function RoleService:_infectedCount(): number
+	local n = 0
+	for _, role in self._roles do
+		if role == "ZOMBIE" or role == "PATIENT_ZERO" then
+			n += 1
+		end
+	end
+	return n
+end
+
 function RoleService:start()
+	Players.CharacterAutoLoads = false
+
 	Players.PlayerAdded:Connect(function(player)
 		if self._roundActive then
 			-- Mid-round joiners join the horde: keeps them playing immediately
@@ -383,6 +461,10 @@ function RoleService:start()
 			self._deps.remotes.fireClient("RoleAssigned", player, { role = "ZOMBIE" })
 			task.defer(function()
 				self:_spawnAsZombie(player)
+			end)
+		else
+			task.defer(function()
+				self:spawnLobby(player)
 			end)
 		end
 	end)
@@ -413,6 +495,10 @@ function RoleService:start()
 			end
 		elseif role == "SURVIVOR" then
 			self._deps.onSurvivorCountChanged(self:survivorCount())
+		elseif role == "ZOMBIE" and self:_infectedCount() == 0 then
+			-- Every infected player left after PZ was unmasked: survivors win now
+			-- instead of waiting out an empty timer (finding #4)
+			self._deps.onPatientZeroGone()
 		end
 	end)
 end

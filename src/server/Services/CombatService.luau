@@ -105,6 +105,25 @@ local function isProtected(character: Model): boolean
 	return character:FindFirstChildOfClass("ForceField") ~= nil
 end
 
+-- The claimed fire origin must be near the character AND reachable from it: a
+-- clear ray from the head to the claimed origin. Otherwise a 12-stud tolerance
+-- lets exploiters project their muzzle through walls (finding #6).
+local function originReachable(character: Model, root: BasePart, origin: Vector3): boolean
+	if (origin - root.Position).Magnitude > ORIGIN_TOLERANCE then
+		return false
+	end
+	local head = character:FindFirstChild("Head")
+	local from = (head and head:IsA("BasePart") and head.Position) or root.Position
+	local offset = origin - from
+	if offset.Magnitude < 0.5 then
+		return true
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { character }
+	return workspace:Raycast(from, offset) == nil
+end
+
 -- Guns ---------------------------------------------------------------------------
 
 function CombatService:_weaponStateFor(player: Player, weaponId: string): WeaponState
@@ -158,8 +177,8 @@ function CombatService:handleFireWeapon(
 		return
 	end
 
-	-- Origin must be near the actual character (anti "shoot from anywhere")
-	if (payload.origin - (root :: BasePart).Position).Magnitude > ORIGIN_TOLERANCE then
+	-- Origin must be near the actual character and not through a wall
+	if not originReachable(character :: Model, root :: BasePart, payload.origin) then
 		self:_flag(player)
 		return
 	end
@@ -283,7 +302,7 @@ function CombatService:handleThrowKnife(player: Player, payload: { origin: Vecto
 	if character == nil or root == nil then
 		return
 	end
-	if (payload.origin - (root :: BasePart).Position).Magnitude > ORIGIN_TOLERANCE then
+	if not originReachable(character :: Model, root :: BasePart, payload.origin) then
 		self:_flag(player)
 		return
 	end
@@ -407,13 +426,19 @@ end
 -- Sprint -------------------------------------------------------------------------
 
 function CombatService:handleSprint(player: Player, payload: { sprinting: string })
+	-- Zombies don't sprint: their class sets their speed, and letting them toggle
+	-- sprint would overwrite Runner/Tank multipliers (finding #7).
+	local role = self._deps.roleService:getRole(player)
+	if role ~= "SURVIVOR" and role ~= "PATIENT_ZERO" then
+		return
+	end
 	local _, humanoid = characterOf(player)
 	if humanoid == nil then
 		return
 	end
 	local sprinting = payload.sprinting == "on"
 	local speed = if sprinting then GameConfig.Movement.SprintWalkSpeed else GameConfig.Movement.BaseWalkSpeed
-	if self._deps.roleService:getRole(player) == "PATIENT_ZERO" and sprinting then
+	if role == "PATIENT_ZERO" and sprinting then
 		speed *= GameConfig.Combat.PatientZero.SprintMult
 	end
 	local h = humanoid :: Humanoid
