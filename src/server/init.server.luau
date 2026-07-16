@@ -18,6 +18,8 @@ if game:GetService("RunService"):IsStudio() then
 end
 local RoundService = require(script.Services.RoundService)
 local RoleService = require(script.Services.RoleService)
+local CombatService = require(script.Services.CombatService)
+local AntiCheatService = require(script.Services.AntiCheatService)
 
 local remotes = Remotes.server()
 
@@ -63,8 +65,26 @@ roundService = RoundService.new({
 	onIntermission = function() end,
 })
 
+local combatService = CombatService.new({
+	remotes = remotes,
+	roleService = roleService,
+	isRoundActive = function()
+		return roundService:getState() == "ACTIVE"
+	end,
+	onZombieKilled = function(_killer: Player, _victim: Player)
+		-- EconomyService hooks in here in Phase 5
+	end,
+})
+
+local antiCheatService = AntiCheatService.new({
+	remotes = remotes,
+	combatService = combatService,
+})
+
 roleService:start()
 roundService:start()
+combatService:start()
+antiCheatService:start()
 
 -- Studio-only smoke test: exercises the whole round loop with fast timers and
 -- scripted deaths so a local multi-client playtest verifies itself in the Output.

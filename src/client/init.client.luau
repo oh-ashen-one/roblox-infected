@@ -9,6 +9,9 @@ local Remotes = require(Shared.Remotes)
 
 local remotes = Remotes.client()
 
+local CombatController = require(script.Controllers.CombatController)
+CombatController.start(remotes)
+
 remotes.on("RoundState", function(state)
 	print(
 		("[INFECTED] Round state: %s (players=%d, survivors=%d)"):format(
