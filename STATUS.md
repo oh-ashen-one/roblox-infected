@@ -14,6 +14,20 @@ strangers (16+) and runs on Roblox's live public infrastructure. A full multipla
 round showing conversions just needs 2+ players in the server (prod config; Studio
 fast-timers not in play live).
 
+# ⚠️ Bots + lobby update built & committed, NOT YET on the live game
+
+Added solo-play **bots** (fill lobby to 8, get roles, wander/hunt/convert, shot by
+guns / converted by knife) and fixed the **empty-baseplate** (a lobby map now always
+loads). Built, tested (37 green), headless-verified, committed + pushed.
+
+**Blocked pushing it live by an ACCOUNT MISMATCH:** Roblox Studio on this machine is
+signed into `solashenone1`, but the published INFECTED game is owned by `solashenone`
+(the account the web/Chrome session + eligibility verification are on). Studio can't
+publish an update to a game it doesn't own — INFECTED doesn't appear in solashenone1's
+cloud experiences. To ship the bot update: sign Studio into `solashenone`, then
+`rojo serve` + connect the Rojo plugin (or File → Publish) to overwrite the place.
+The currently LIVE public game still works — it just doesn't have bots yet.
+
 # Build status vs Definition of Done
 
 Updated 2026-07-17 (published PRIVATE to Roblox as "INFECTED - Hidden Zombie Among You"; latest build with all fixes + sounds is live on the cloud place).
