@@ -18,7 +18,10 @@ function Touch.start(
 		setSprint: (on: boolean) -> (),
 	}
 )
-	if not (UserInputService.TouchEnabled and not UserInputService.MouseEnabled) then
+	-- Any touch-capable device gets the buttons (tablets with mice and Studio's
+	-- Device Emulator report both touch AND mouse; requiring mouse-absence hid
+	-- the controls there).
+	if not UserInputService.TouchEnabled then
 		return {}
 	end
 
