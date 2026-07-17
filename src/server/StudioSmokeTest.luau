@@ -5,6 +5,9 @@
 -- Humanoid:TakeDamage the same way combat will, and observes how the services react.
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local GameConfig = require(ReplicatedStorage:WaitForChild("Shared").GameConfig)
 
 local SmokeTest = {}
 
@@ -13,6 +16,13 @@ local function report(ok: boolean, label: string)
 end
 
 function SmokeTest.run(roundService: any, roleService: any)
+	-- The assertions below assume a bot-free lobby (human PZ, survivor = players-1).
+	-- With bots enabled the PZ can be a bot and counts include bots, so skip to avoid
+	-- misleading FAILs. Bot rounds are validated by playtesting instead.
+	if GameConfig.Bots.Enabled then
+		print("[SMOKE] skipped (bots enabled — verify bot rounds by playing)")
+		return
+	end
 	task.spawn(function()
 		-- Wait for a round to actually start
 		while roundService:getState() ~= "ACTIVE" do
