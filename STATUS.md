@@ -9,9 +9,9 @@ Updated 2026-07-17 (published PRIVATE to Roblox as "INFECTED - Hidden Zombie Amo
 | Server-auth combat + anti-cheat observed | ⏳ conversion kills observed; gun/knife feel + anti-cheat rejections = Hari's hands-on pass |
 | Economy/shop/crates/skins persist across rejoin | ✅ coin payouts observed persisting across rounds (35/70 coins); crates/skins = hands-on pass |
 | Desktop + mobile UI | ✅ desktop HUD observed live; mobile touch layout verified in iPhone XR Device Emulator |
-| Gamepasses + dev products, idempotent receipts | ⏳ Creator Hub (web login needed): create products, wire IDs, test-purchase |
+| Gamepasses + dev products, idempotent receipts | ✅ created (off-sale) + IDs wired into GameConfig; test-purchase after pricing |
 | CI green | ✅ |
-| Published public + real round played | ⏳ published PRIVATE; public flip needs Creator Hub: eligibility questionnaire, Max Players 30, icon/thumbnails, then Access → Public |
+| Published public + real round played | ⏳ private, fully configured (Max Players 30, icon, thumbnail, questionnaire = Mild label); awaiting Hari: price approvals + public flip |
 | Runbook | ✅ docs/runbook.md (+ docs/publish-checklist.md) |
 
 ## How to run the multi-client playtest (once Studio is drivable)
@@ -34,3 +34,9 @@ Updated 2026-07-17 (published PRIVATE to Roblox as "INFECTED - Hidden Zombie Amo
 - `RobloxStudio -task StartServer` CLI: broken on macOS Studio 0.730 ("Cannot open
   place file for reading") for every path/format/flag combination.
 - `Players:CreateLocalPlayer()` from injected plugin: blocked (LocalUser capability).
+
+## Live product IDs (universe 10518289514, place 78267419085369)
+
+Gamepasses: 2x Coins 1919414556 · XP Boost 1917980542 · VIP 1918454539 · Radio 1918040566
+Dev products: 1k Coins 3610363831 · 5k 3610363881 · 12k 3610363919 · CrateKey 3610364225 · 5 Keys 3610364383 · PZ Token 3610364441
+All off-sale until prices approved (sheet in docs/store-page.md).
