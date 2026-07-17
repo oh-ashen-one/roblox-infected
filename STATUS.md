@@ -1,18 +1,18 @@
 # Build status vs Definition of Done
 
-Updated 2026-07-16 (all code pushed, CI green — 37 tests, selene/stylua clean).
+Updated 2026-07-17 (published PRIVATE to Roblox as "INFECTED - Hidden Zombie Among You"; latest build with all fixes + sounds is live on the cloud place).
 
 | DoD item | Status |
 | --- | --- |
-| Round flow end-to-end multi-client | ⏳ code complete + solo-boot verified headless; **needs Studio "Clients and Servers" playtest** |
-| 3 maps built, streamed, voted | ✅ code complete (Mall/Suburbia/Facility); rotation logic in MapService — verify visuals in playtest |
-| Server-auth combat + anti-cheat observed | ⏳ implemented; needs playtest observation |
-| Economy/shop/crates/skins persist across rejoin | ⏳ implemented on ProfileStore; needs playtest |
-| Desktop + mobile UI | ✅ implemented (HUD/role card/reveal/vote/shop/settings/touch/gamepad) — verify in playtest |
-| Gamepasses + dev products, idempotent receipts | ⏳ code + pricing sheet ready (docs/store-page.md); products created at publish; IDs → GameConfig.Products |
+| Round flow end-to-end multi-client | ✅ observed live (Server and Clients, 2 players): intermission → vote → round → PZ role card → conversion → INFECTED win → reveal w/ PZ unmask → next intermission |
+| 3 maps built, streamed, voted | ✅ vote UI live; Suburbia observed loading with night lighting; Mall/Facility rotation pending hands-on pass |
+| Server-auth combat + anti-cheat observed | ⏳ conversion kills observed; gun/knife feel + anti-cheat rejections = Hari's hands-on pass |
+| Economy/shop/crates/skins persist across rejoin | ✅ coin payouts observed persisting across rounds (35/70 coins); crates/skins = hands-on pass |
+| Desktop + mobile UI | ✅ desktop HUD observed live; mobile touch layout verified in iPhone XR Device Emulator |
+| Gamepasses + dev products, idempotent receipts | ⏳ Creator Hub (web login needed): create products, wire IDs, test-purchase |
 | CI green | ✅ |
-| Published public + real round played | ❌ blocked: needs Studio UI (computer-use) |
-| Runbook | ✅ docs/runbook.md |
+| Published public + real round played | ⏳ published PRIVATE; public flip needs Creator Hub: eligibility questionnaire, Max Players 30, icon/thumbnails, then Access → Public |
+| Runbook | ✅ docs/runbook.md (+ docs/publish-checklist.md) |
 
 ## How to run the multi-client playtest (once Studio is drivable)
 
