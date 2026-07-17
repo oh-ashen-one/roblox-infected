@@ -5,6 +5,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
+local PolicyService = game:GetService("PolicyService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared.GameConfig)
@@ -28,9 +29,11 @@ function EconomyService.new(deps: Deps)
 	self._firstBloodClaimed = false
 	self._roundEarnings = {} :: { [Player]: number } -- for reveal-screen MVP stats
 	self._gamepassCache = {} :: { [Player]: { [number]: boolean } }
+	self._policyCache = {} :: { [Player]: boolean }
 	Players.PlayerRemoving:Connect(function(player)
 		self._roundEarnings[player] = nil
 		self._gamepassCache[player] = nil
+		self._policyCache[player] = nil
 	end)
 	return self
 end
@@ -158,7 +161,22 @@ end
 
 -- Shop ----------------------------------------------------------------------------
 
+-- Paid-random-item compliance (declared in the content questionnaire): players in
+-- regions where paid random items are restricted cannot open crates at all.
+function EconomyService:_crateAllowedFor(player: Player): boolean
+	local cache = self._policyCache[player]
+	if cache == nil then
+		local ok, info = pcall(PolicyService.GetPolicyInfoForPlayerAsync, PolicyService, player)
+		cache = not (ok and info and info.ArePaidRandomItemsRestricted == true)
+		self._policyCache[player] = cache
+	end
+	return cache
+end
+
 function EconomyService:openCrate(player: Player, viaRobux: boolean): boolean
+	if not self:_crateAllowedFor(player) then
+		return false
+	end
 	local data = self._deps.dataService:get(player)
 	if data == nil then
 		return false
