@@ -100,6 +100,12 @@ function CombatController.start(remotes: any)
 	end
 
 	function actions.melee()
+		-- Swing-based: server finds the nearest survivor (player OR bot) in range.
+		-- Also send the legacy targeted melee when a human target is right there.
+		local origin, direction = myOriginAndDirection()
+		if origin and direction then
+			remotes.fire("MeleeSwing", { origin = origin, direction = direction })
+		end
 		local target = nearestSurvivorTarget(GameConfig.Combat.Zombie.MeleeRange)
 		if target then
 			remotes.fire("MeleeAttack", { targetUserId = target })

@@ -84,6 +84,14 @@ local GameConfig = {
 		WinMultiplier = 2,
 	},
 
+	-- Bots fill the lobby so a solo (or under-filled) server still plays a full round.
+	Bots = {
+		Enabled = true,
+		TargetPlayers = 8, -- fill humans + bots up to this headcount
+		MaxBots = 11, -- never spawn more than this
+		ThinkInterval = 0.35, -- AI tick period (seconds)
+	},
+
 	Movement = {
 		BaseWalkSpeed = 16,
 		SprintWalkSpeed = 24,

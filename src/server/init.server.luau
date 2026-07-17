@@ -18,6 +18,7 @@ local DataService = require(script.Services.DataService)
 local EconomyService = require(script.Services.EconomyService)
 local MonetizationService = require(script.Services.MonetizationService)
 local EndgameService = require(script.Services.EndgameService)
+local BotService = require(script.Services.BotService)
 
 -- Fast timers in Studio so a full round loop plays out in under a minute of testing.
 if game:GetService("RunService"):IsStudio() then
@@ -40,6 +41,18 @@ local remotes = Remotes.server()
 local roundService
 local roleService
 local endgameService
+local botService
+
+-- Total survivor count = human survivors + bot survivors. Both RoleService (humans)
+-- and BotService (bots) call this whenever their counts change so the round machine
+-- ends the round only when every survivor — human or bot — is converted.
+local function refreshCounts()
+	local total = roleService:survivorCount() + (botService and botService:survivorCount() or 0)
+	roundService:setSurvivorCount(total)
+	endgameService:onSurvivorCountChanged(total)
+end
+
+local rng = Random.new()
 
 local mapService = MapService.new({ remotes = remotes })
 local dataService = DataService.new({ remotes = remotes })
@@ -67,9 +80,8 @@ roleService = RoleService.new({
 			killerName = killer and killer.DisplayName or nil,
 		})
 	end,
-	onSurvivorCountChanged = function(count: number)
-		roundService:setSurvivorCount(count)
-		endgameService:onSurvivorCountChanged(count)
+	onSurvivorCountChanged = function(_count: number)
+		refreshCounts()
 	end,
 	onPatientZeroGone = function()
 		-- PZ left before creating any zombies: survivors win by default
@@ -85,9 +97,38 @@ endgameService = EndgameService.new({
 	end,
 })
 
+botService = BotService.new({
+	remotes = remotes,
+	getSurvivorSpawn = function()
+		return mapService:randomSurvivorSpawn()
+	end,
+	getZombieSpawn = function(survivorRoots)
+		return mapService:zombieSpawnNearAction(survivorRoots)
+	end,
+	getHumanSurvivors = function()
+		return roleService:survivors()
+	end,
+	convertHuman = function(victim: Player)
+		roleService:convert(victim, nil)
+	end,
+	onBotKilledByHuman = function(killer: Player)
+		economyService:onZombieKilled(killer)
+	end,
+	onBotConvertedByHuman = function(killer: Player)
+		economyService:onConversion(killer)
+	end,
+	onConversionOccurred = function()
+		roundService:recordConversion()
+	end,
+	onCountsChanged = function()
+		refreshCounts()
+	end,
+})
+
 local combatService = CombatService.new({
 	remotes = remotes,
 	roleService = roleService,
+	botService = botService,
 	isRoundActive = function()
 		return roundService:getState() == "ACTIVE"
 	end,
@@ -110,12 +151,32 @@ local antiCheatService = AntiCheatService.new({
 
 roundService = RoundService.new({
 	remotes = remotes,
+	getExtraCount = function()
+		return botService:plannedCount(#Players:GetPlayers())
+	end,
 	onRoundStart = function(playersInRound)
 		economyService:resetRound()
 		combatService:resetRound()
 		endgameService:resetRound()
 		mapService:loadVotedMap()
-		roleService:assignRoles(playersInRound)
+
+		-- Decide whether the Patient Zero is a human or a bot. With one human and
+		-- several bots, the human is usually a survivor being hunted (more fun solo),
+		-- and occasionally the hidden infected.
+		local humanCount = #playersInRound
+		local botCount = botService:plannedCount(humanCount)
+		local totalParticipants = math.max(1, humanCount + botCount)
+		local pzIsHuman = humanCount > 0 and rng:NextInteger(1, totalParticipants) <= humanCount
+
+		roleService:assignRoles(playersInRound, { allSurvivors = not pzIsHuman })
+		botService:spawnForRound(botCount, { botIsPZ = not pzIsHuman })
+		if not pzIsHuman then
+			local pzName = botService:patientZeroName()
+			if pzName then
+				roleService:setOriginalPZName(pzName)
+			end
+		end
+		refreshCounts()
 	end,
 	onRoundEnd = function(winner)
 		local originalPZ = roleService:getOriginalPatientZero()
@@ -123,6 +184,9 @@ roundService = RoundService.new({
 		local survivorNames = {}
 		for _, survivor in survivors do
 			table.insert(survivorNames, survivor.DisplayName)
+		end
+		for _, botName in botService:survivorNames() do
+			table.insert(survivorNames, botName)
 		end
 		economyService:onRoundEnd(winner, survivors, Players:GetPlayers())
 		local earnings = {}
@@ -136,9 +200,11 @@ roundService = RoundService.new({
 			earnings = earnings,
 		})
 		roleService:endRound()
+		botService:clear()
 	end,
 	onIntermission = function()
-		mapService:unload()
+		-- Keep a map loaded as the lobby so players never stand on an empty baseplate.
+		mapService:loadLobby()
 		mapService:openVote()
 	end,
 })
@@ -152,6 +218,11 @@ mapService:start()
 economyService:start()
 monetizationService:start()
 endgameService:start()
+botService:start()
+
+-- Load a lobby map immediately so the very first pre-round moment isn't an empty
+-- baseplate.
+mapService:loadLobby()
 
 -- Studio-only smoke test: exercises the whole round loop with fast timers and
 -- scripted deaths so a local multi-client playtest verifies itself in the Output.

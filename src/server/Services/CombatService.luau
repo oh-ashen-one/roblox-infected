@@ -25,6 +25,7 @@ export type Deps = {
 	onZombieKilled: (killer: Player, victim: Player) -> (), -- rewards
 	isLastStand: ((player: Player) -> boolean)?, -- damage resist + Minigun access
 	getPrimary: ((player: Player) -> string)?, -- selected loadout (nil -> allow all)
+	botService: any?, -- optional; routes bot hits/conversions
 }
 
 -- Claimed fire origin may be at most this far from the character's actual head
@@ -237,6 +238,13 @@ function CombatService:_hitscan(
 	end
 	local victim = playerFromHit(result.Instance)
 	if victim == nil then
+		-- Could be a bot: only zombie bots take gun damage (mirrors the player rule).
+		-- Rewards are routed inside BotService:damageBot via onBotKilledByHuman.
+		local model = result.Instance:FindFirstAncestorOfClass("Model")
+		if self._deps.botService and model and self._deps.botService:isZombieBot(model) then
+			local killed = self._deps.botService:damageBot(model, spec.Damage, shooter)
+			self._deps.remotes.fireClient("HitConfirm", shooter, { killed = killed })
+		end
 		return
 	end
 	local victimRole = self._deps.roleService:getRole(victim)
@@ -343,6 +351,14 @@ function CombatService:_simulateKnife(
 			local result = workspace:Raycast(position, step, params)
 			if result ~= nil then
 				local victim = playerFromHit(result.Instance)
+				if victim == nil then
+					-- Knife converts a survivor bot on contact.
+					local model = result.Instance:FindFirstAncestorOfClass("Model")
+					if self._deps.botService and model then
+						self._deps.botService:convertBot(model, thrower)
+					end
+					return
+				end
 				if victim ~= nil and victim ~= thrower then
 					local victimChar, victimHumanoid = characterOf(victim)
 					local role = self._deps.roleService:getRole(victim)
@@ -423,6 +439,79 @@ function CombatService:handleMelee(player: Player, payload: { targetUserId: numb
 	th:TakeDamage(damage)
 end
 
+-- Swing melee: a target-less claw/stab that converts the nearest survivor (player or
+-- bot) in range. This is what lets a human infected fight bots without a client-known
+-- target userId.
+function CombatService:handleMeleeSwing(player: Player, _payload: { origin: Vector3, direction: Vector3 })
+	if not self._deps.isRoundActive() then
+		return
+	end
+	local role = self._deps.roleService:getRole(player)
+	if role ~= "PATIENT_ZERO" and role ~= "ZOMBIE" then
+		self:_flag(player)
+		return
+	end
+	local now = os.clock()
+	local last = self._lastMelee[player] or 0
+	local cooldown = if role == "PATIENT_ZERO"
+		then GameConfig.Combat.PatientZero.MeleeCooldown
+		else GameConfig.Combat.Zombie.MeleeCooldown
+	if now - last < cooldown * 0.9 then
+		return
+	end
+	local _, _, myRoot = characterOf(player)
+	if myRoot == nil then
+		return
+	end
+	local myPos = (myRoot :: BasePart).Position
+	local range = GameConfig.Combat.Zombie.MeleeRange + 2
+
+	-- Nearest human survivor
+	local bestPlayer: Player? = nil
+	local bestDist = range
+	for _, other in Players:GetPlayers() do
+		if other ~= player and self._deps.roleService:getRole(other) == "SURVIVOR" then
+			local _, oh, oRoot = characterOf(other)
+			if oh and oRoot then
+				local d = ((oRoot :: BasePart).Position - myPos).Magnitude
+				if d < bestDist then
+					bestPlayer, bestDist = other, d
+				end
+			end
+		end
+	end
+	if bestPlayer then
+		self._lastMelee[player] = now
+		tagKiller(bestPlayer, player)
+		local _, th = characterOf(bestPlayer)
+		if th then
+			(th :: Humanoid):TakeDamage((th :: Humanoid).MaxHealth)
+		end
+		return
+	end
+
+	-- Otherwise nearest survivor bot
+	if self._deps.botService then
+		local bestBot: Model? = nil
+		bestDist = range
+		for _, model in workspace:GetChildren() do
+			if model:IsA("Model") and self._deps.botService:isSurvivorBot(model) then
+				local r = model:FindFirstChild("HumanoidRootPart")
+				if r and r:IsA("BasePart") then
+					local d = (r.Position - myPos).Magnitude
+					if d < bestDist then
+						bestBot, bestDist = model, d
+					end
+				end
+			end
+		end
+		if bestBot then
+			self._lastMelee[player] = now
+			self._deps.botService:convertBot(bestBot, player)
+		end
+	end
+end
+
 -- Sprint -------------------------------------------------------------------------
 
 function CombatService:handleSprint(player: Player, payload: { sprinting: string })
@@ -457,6 +546,9 @@ function CombatService:start()
 	end)
 	remotes.onValidated("MeleeAttack", function(player, payload)
 		self:handleMelee(player, payload)
+	end)
+	remotes.onValidated("MeleeSwing", function(player, payload)
+		self:handleMeleeSwing(player, payload)
 	end)
 	remotes.onValidated("Reload", function(player, payload)
 		self:handleReload(player, payload)

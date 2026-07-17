@@ -119,6 +119,11 @@ function RoleService:getOriginalPatientZero(): { userId: number, name: string }?
 	return self._originalPZ
 end
 
+-- Used when a bot is Patient Zero, so the end-of-round reveal can name it.
+function RoleService:setOriginalPZName(name: string)
+	self._originalPZ = { userId = -1, name = name }
+end
+
 function RoleService:survivorCount(): number
 	local n = 0
 	for _, role in self._roles do
@@ -141,7 +146,8 @@ end
 
 -- Round lifecycle ---------------------------------------------------------------
 
-function RoleService:assignRoles(playersInRound: { Player })
+-- opts.allSurvivors: no human is Patient Zero this round (a bot will be instead).
+function RoleService:assignRoles(playersInRound: { Player }, opts: { allSurvivors: boolean }?)
 	self._roundActive = true
 	self._firstBloodDone = false
 	table.clear(self._roles)
@@ -159,9 +165,11 @@ function RoleService:assignRoles(playersInRound: { Player })
 	for _, player in playersInRound do
 		table.insert(candidates, { userId = player.UserId, roundsSincePZ = self._pzHistory[player.UserId] })
 	end
-	local pzUserId = PatientZero.select(candidates, GameConfig.Round.PatientZeroRecentRounds, function()
-		return rng:NextNumber()
-	end)
+	local pzUserId = if opts and opts.allSurvivors
+		then -1
+		else PatientZero.select(candidates, GameConfig.Round.PatientZeroRecentRounds, function()
+			return rng:NextNumber()
+		end)
 
 	for _, player in playersInRound do
 		if player.UserId == pzUserId then

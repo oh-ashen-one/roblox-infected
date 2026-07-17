@@ -19,6 +19,9 @@ export type Deps = {
 	onRoundStart: ((playersInRound: { Player }) -> ())?,
 	onRoundEnd: ((winner: string) -> ())?,
 	onIntermission: (() -> ())?,
+	-- Extra virtual participants (bots) added to the human count so rounds can start
+	-- and reach the min-players threshold with a single human.
+	getExtraCount: (() -> number)?,
 }
 
 function RoundService.new(deps: Deps)
@@ -82,16 +85,21 @@ function RoundService:_execute(effects)
 	end
 end
 
+function RoundService:_totalCount(): number
+	local extra = self._deps.getExtraCount and self._deps.getExtraCount() or 0
+	return #Players:GetPlayers() + extra
+end
+
 function RoundService:start()
 	local function syncPlayerCount()
-		self:_execute(self._machine:setPlayerCount(#Players:GetPlayers(), os.clock()))
+		self:_execute(self._machine:setPlayerCount(self:_totalCount(), os.clock()))
 		self:_broadcastState()
 	end
 	Players.PlayerAdded:Connect(syncPlayerCount)
 	Players.PlayerRemoving:Connect(function(leaving)
 		-- Run after the player is actually gone from GetPlayers()
 		task.defer(function()
-			self:_execute(self._machine:setPlayerCount(#Players:GetPlayers(), os.clock()))
+			self:_execute(self._machine:setPlayerCount(self:_totalCount(), os.clock()))
 			self:_broadcastState()
 		end)
 		local _ = leaving

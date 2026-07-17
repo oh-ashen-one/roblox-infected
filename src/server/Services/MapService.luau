@@ -111,6 +111,25 @@ function MapService:unload()
 	end
 end
 
+-- A map is always present so players never stand on an empty baseplate. Used during
+-- intermission and at server start; a round replaces it via loadVotedMap().
+function MapService:loadLobby()
+	self:unload()
+	local index = rng:NextInteger(1, #MAPS)
+	self._activeIndex = index
+	local clone = self._built[index]:Clone()
+	clone.Name = "ActiveMap"
+	clone.Parent = workspace
+	local lighting = MAPS[index].lighting
+	Lighting.Ambient = lighting.Ambient
+	Lighting.OutdoorAmbient = lighting.OutdoorAmbient
+	Lighting.ClockTime = lighting.ClockTime
+	Lighting.FogEnd = lighting.FogEnd
+	Lighting.FogColor = lighting.FogColor
+	self._active = clone
+	return clone
+end
+
 -- Spawns -------------------------------------------------------------------------
 
 function MapService:_spawnsIn(folderName: string): { BasePart }

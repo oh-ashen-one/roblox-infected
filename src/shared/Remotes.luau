@@ -33,6 +33,10 @@ local Specs: { [string]: Spec } = {
 		validator = v.shape({ targetUserId = v.integer(1) }),
 		ratePerSecond = 6,
 	},
+	MeleeSwing = {
+		validator = v.shape({ origin = v.vector3(4096), direction = v.unitVector3() }),
+		ratePerSecond = 6,
+	},
 	VoteMap = { validator = v.shape({ mapIndex = v.integer(1, 3) }), ratePerSecond = 5 },
 	SelectLoadout = {
 		validator = v.shape({ primary = v.oneOf({ "AssaultRifle", "Shotgun", "SMG" }) }),
