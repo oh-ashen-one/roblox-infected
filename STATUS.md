@@ -6,6 +6,14 @@ maturity label, all products free. Currently reaching 16+ & trusted friends; ope
 all-ages the moment 2-step verification is completed (Settings → Eligibility). No
 re-publish needed for that.
 
+**Public round verified 2026-07-17:** launched the live public game from the Roblox
+page → a real Roblox Cloud Compute (RCC) server spun up (DatacenterId 387) and the
+play client (`isPlayClient=1`) booted our game on it — player log shows
+`[INFECTED] Client booted` + `Server Prefix: ..._RCC_d6dd4`. The game is joinable by
+strangers (16+) and runs on Roblox's live public infrastructure. A full multiplayer
+round showing conversions just needs 2+ players in the server (prod config; Studio
+fast-timers not in play live).
+
 # Build status vs Definition of Done
 
 Updated 2026-07-17 (published PRIVATE to Roblox as "INFECTED - Hidden Zombie Among You"; latest build with all fixes + sounds is live on the cloud place).
