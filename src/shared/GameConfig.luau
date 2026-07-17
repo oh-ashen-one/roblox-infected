@@ -121,21 +121,22 @@ local GameConfig = {
 		LobbyMusic = 15675069601, -- "Roblox_UI_Loop_Calm_Music" (95s loop)
 	},
 
-	-- Filled in at publish time (Phase 7); 0 = not yet created.
+	-- Created on Creator Hub 2026-07-17 (universe 10518289514). All start off-sale;
+	-- prices go live only after Hari approves them.
 	Products = {
 		GamePasses = {
-			DoubleCoins = 0,
-			XPBoost = 0,
-			VIP = 0,
-			Radio = 0,
+			DoubleCoins = 1919414556,
+			XPBoost = 1917980542,
+			VIP = 1918454539,
+			Radio = 1918040566,
 		},
 		DevProducts = {
-			Coins1000 = 0,
-			Coins5000 = 0,
-			Coins12000 = 0,
-			CrateKey1 = 0,
-			CrateKey5 = 0,
-			PatientZeroToken = 0,
+			Coins1000 = 3610363831,
+			Coins5000 = 3610363881,
+			Coins12000 = 3610363919,
+			CrateKey1 = 3610364225,
+			CrateKey5 = 3610364383,
+			PatientZeroToken = 3610364441,
 		},
 	},
 }
