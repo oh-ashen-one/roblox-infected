@@ -1,3 +1,11 @@
+# 🎉 LIVE — https://www.roblox.com/games/78267419085369/INFECTED-Hidden-Zombie-Among-You
+
+**Published PUBLIC on Roblox 2026-07-17** (universe 10518289514, place 78267419085369,
+by @solashenone). 30-player servers, icon + thumbnails + keyword description, Mild/16+
+maturity label, all products free. Currently reaching 16+ & trusted friends; opens to
+all-ages the moment 2-step verification is completed (Settings → Eligibility). No
+re-publish needed for that.
+
 # Build status vs Definition of Done
 
 Updated 2026-07-17 (published PRIVATE to Roblox as "INFECTED - Hidden Zombie Among You"; latest build with all fixes + sounds is live on the cloud place).
