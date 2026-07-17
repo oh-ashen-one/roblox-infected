@@ -11,8 +11,29 @@ Updated 2026-07-17 (published PRIVATE to Roblox as "INFECTED - Hidden Zombie Amo
 | Desktop + mobile UI | ✅ desktop HUD observed live; mobile touch layout verified in iPhone XR Device Emulator |
 | Gamepasses + dev products, idempotent receipts | ✅ created (off-sale) + IDs wired into GameConfig; test-purchase after pricing |
 | CI green | ✅ |
-| Published public + real round played | ⏳ private, fully configured (Max Players 30, icon, thumbnail, questionnaire = Mild label); awaiting Hari: price approvals + public flip |
+| Published public + real round played | 🔒 BLOCKED on account verification. "Public" audience is pre-selected but rejected: "You don't have permission to publish to this audience." solashenone must complete Roblox publishing-eligibility (below). Everything else is done + free-to-play. |
 | Runbook | ✅ docs/runbook.md (+ docs/publish-checklist.md) |
+
+## 🔒 The one remaining blocker — account verification (Hari only)
+
+To publish a **public / all-ages** experience, the `solashenone` account must complete
+three one-time identity steps at **create.roblox.com → Settings → Eligibility →
+Publishing permissions** (click **Start** on each):
+
+1. **Identity verification** — government ID. (Only Hari can do this; entering a
+   government ID is not something the assistant will ever do.)
+2. **Age check** — webcam age estimation of Hari's face.
+3. **2-step verification** — authenticator app or SMS on Hari's account.
+
+Once all three show ✅ under the "Publish to all ages" column:
+- Experience → **Configure → Settings → Audience → Public → Save** (Public is already
+  the selected option; it just needs the verified account behind it).
+- Products are all **off-sale (free)** per Hari's "all free" call — nothing to price.
+- Then join the public game (Roblox player installed on this Mac, or phone) for the
+  first real public round.
+
+Decision recorded 2026-07-17: Hari said "all free and go public." Public flip executed
+up to the verification wall; products left free.
 
 ## How to run the multi-client playtest (once Studio is drivable)
 
