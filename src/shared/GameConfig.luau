@@ -109,15 +109,16 @@ local GameConfig = {
 
 	-- Roblox audio asset ids; 0 disables a sound. Filled/verified in the Studio pass
 	-- (audio must be owned/licensed to play for all users, so IDs are set there).
+	-- All Roblox-owned (creator id 1) classic audio — playable in any experience.
 	Sounds = {
-		GunShot = 0,
-		KnifeThrow = 0,
-		Conversion = 0,
-		RoundStart = 0,
-		SurvivorsWin = 0,
-		InfectedWin = 0,
-		Heartbeat = 0, -- endgame tension loop
-		LobbyMusic = 0,
+		GunShot = 12222132, -- "Shoulder fired rocket" (short punchy crack)
+		KnifeThrow = 12222200, -- "swoosh"
+		Conversion = 9120031442, -- thunder/roar sting
+		RoundStart = 12222019, -- "HalloweenLightning"
+		SurvivorsWin = 12222253, -- "victory"
+		InfectedWin = 12222030, -- "HalloweenThunder"
+		Heartbeat = 0, -- no Roblox-owned loop found; disabled until a licensed one is picked
+		LobbyMusic = 15675069601, -- "Roblox_UI_Loop_Calm_Music" (95s loop)
 	},
 
 	-- Filled in at publish time (Phase 7); 0 = not yet created.
