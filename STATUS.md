@@ -14,10 +14,17 @@ strangers (16+) and runs on Roblox's live public infrastructure. A full multipla
 round showing conversions just needs 2+ players in the server (prod config; Studio
 fast-timers not in play live).
 
-# 🚧 "1000×" upgrade in progress (GOAL-1000X.md) — built + CI-green, awaiting a Studio publish
+# 🚀 "1000×" upgrade — LIVE (published 2026-07-18, version 6)
 
-Executing GOAL-1000X.md. Shipped to `main` (CI green, 50 tests), NOT yet pushed to the
-live Roblox place — that needs a Studio publish from the owner account (see below):
+Executed GOAL-1000X.md end-to-end and **published to the live place** `78267419085369`
+(universe 10518289514) via Roblox Open Cloud (`scripts/publish.sh`, HTTP 200,
+versionNumber 6). All 8 phases are live: 30 feature slices, server-authoritative, no
+pay-to-win, 84 unit tests green, headless-boot-validated.
+
+Post-launch, still worth a hands-on pass when convenient: perf numeric tuning on a full
+30-player server and visual polish of the ragdoll/kill effects. Everything else is shipped.
+
+## Feature summary (all live)
 
 - **Phase A — game-feel juice:** trauma camera shake + FOV punch, floating damage numbers,
   muzzle flash + light, impact spray, world-space green conversion bursts, full-screen
