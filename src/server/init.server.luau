@@ -75,9 +75,11 @@ roleService = RoleService.new({
 	onConversion = function(victim: Player, killer: Player?)
 		roundService:recordConversion()
 		economyService:onConversion(killer)
+		local victimRoot = victim.Character and victim.Character:FindFirstChild("HumanoidRootPart")
 		remotes.fireAllClients("ConversionAlert", {
 			victimName = victim.DisplayName,
 			killerName = killer and killer.DisplayName or nil,
+			position = (victimRoot and victimRoot:IsA("BasePart")) and victimRoot.Position or nil,
 		})
 	end,
 	onSurvivorCountChanged = function(_count: number)

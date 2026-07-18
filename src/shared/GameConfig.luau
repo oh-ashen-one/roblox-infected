@@ -127,6 +127,11 @@ local GameConfig = {
 		InfectedWin = 12222030, -- "HalloweenThunder"
 		Heartbeat = 0, -- no Roblox-owned loop found; disabled until a licensed one is picked
 		LobbyMusic = 15675069601, -- "Roblox_UI_Loop_Calm_Music" (95s loop)
+		-- In-round music director stems. 0 = disabled (silent) until a licensed loop is
+		-- dropped in; the tension system (Sounds.luau) already ramps volume/pitch by the
+		-- infected fraction, so adding an id here lights it up with no code change.
+		RoundMusic = 0, -- base in-round bed; intensifies as survivors fall
+		LastStandMusic = 0, -- swaps in when one survivor remains
 	},
 
 	-- Created on Creator Hub 2026-07-17 (universe 10518289514). All start off-sale;

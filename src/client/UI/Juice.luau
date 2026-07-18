@@ -102,6 +102,38 @@ local function damageNumber(position: Vector3, amount: number, killed: boolean)
 	Debris:AddItem(anchor, 0.75)
 end
 
+-- World-space particle burst at a hit or conversion point.
+local function burst(position: Vector3, color: Color3, count: number, speed: number, size: number)
+	local part = Instance.new("Part")
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.Transparency = 1
+	part.Size = Vector3.new(0.2, 0.2, 0.2)
+	part.CFrame = CFrame.new(position)
+	part.Parent = workspace
+
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Color = ColorSequence.new(color)
+	emitter.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, size),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	emitter.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.1),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	emitter.Lifetime = NumberRange.new(0.25, 0.5)
+	emitter.Speed = NumberRange.new(speed * 0.5, speed)
+	emitter.SpreadAngle = Vector2.new(180, 180)
+	emitter.Rotation = NumberRange.new(0, 360)
+	emitter.LightEmission = 0.4
+	emitter.Enabled = false
+	emitter.Parent = part
+	emitter:Emit(count)
+	Debris:AddItem(part, 0.7)
+end
+
 function Juice.start(remotes: any)
 	local gui = Theme.screenGui("Juice", 8)
 
@@ -202,10 +234,22 @@ function Juice.start(remotes: any)
 		haptic(payload.killed and 0.7 or 0.3, payload.killed and 0.16 or 0.05)
 		if payload.position then
 			damageNumber(payload.position, payload.damage or 0, payload.killed == true)
+			-- Impact spray: red on a kill, pale spark otherwise.
+			burst(
+				payload.position,
+				payload.killed and Theme.Colors.Danger or Color3.fromRGB(255, 235, 180),
+				payload.killed and 24 or 10,
+				payload.killed and 22 or 12,
+				payload.killed and 1.4 or 0.7
+			)
 		end
 	end)
 
 	remotes.on("ConversionAlert", function(alert)
+		-- Everyone sees a green outbreak burst where a survivor turned.
+		if alert.position then
+			burst(alert.position, Theme.Colors.Infected, 40, 26, 2)
+		end
 		-- A conversion I personally landed: hitstop-style green flash + heavy kick.
 		if alert.killerName and alert.killerName == LocalPlayer.DisplayName then
 			flashScreen(Theme.Colors.Infected, 0.5)

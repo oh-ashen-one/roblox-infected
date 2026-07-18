@@ -300,9 +300,11 @@ function BotService:convertBot(character: Model, attacker: Player?): boolean
 		self._deps.onBotConvertedByHuman(attacker)
 	end
 	self._deps.onConversionOccurred()
+	local root = character:FindFirstChild("HumanoidRootPart")
 	self._deps.remotes.fireAllClients("ConversionAlert", {
 		victimName = bot.name,
 		killerName = attacker and attacker.DisplayName or nil,
+		position = (root and root:IsA("BasePart")) and root.Position or nil,
 	})
 	self._deps.onCountsChanged()
 	return true
