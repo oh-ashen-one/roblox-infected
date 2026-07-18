@@ -37,6 +37,28 @@ end
 
 -- Apply `overrides` onto `config` (mutated in place) using `whitelist`. Returns which keys
 -- were applied and which were rejected (with a reason), for logging.
+-- Override a round-modifier's weight (enable/disable/reweight an EVENT) by id. Keys look
+-- like "Modifier.blackout.weight". Weight 0 removes it from rotation. This is what makes
+-- events config-driven with no republish.
+local function applyModifierWeight(config: any, modId: string, value: any): (boolean, string?)
+	if type(value) ~= "number" or value ~= value then
+		return false, "not a number"
+	end
+	if value < 0 or value > 100 then
+		return false, "out of range [0, 100]"
+	end
+	if type(config.RoundModifiers) ~= "table" then
+		return false, "no modifiers"
+	end
+	for _, mod in config.RoundModifiers do
+		if mod.id == modId then
+			mod.weight = value
+			return true
+		end
+	end
+	return false, "unknown modifier"
+end
+
 function LiveConfig.apply(
 	config: any,
 	overrides: { [string]: any },
@@ -45,8 +67,16 @@ function LiveConfig.apply(
 	local applied: { [string]: number } = {}
 	local rejected: { [string]: string } = {}
 	for key, value in overrides do
+		local modId = string.match(key, "^Modifier%.(.+)%.weight$")
 		local rule = whitelist[key]
-		if rule == nil then
+		if modId then
+			local ok, reason = applyModifierWeight(config, modId, value)
+			if ok then
+				applied[key] = value
+			else
+				rejected[key] = reason :: string
+			end
+		elseif rule == nil then
 			rejected[key] = "not whitelisted"
 		elseif type(value) ~= "number" then
 			rejected[key] = "not a number"
