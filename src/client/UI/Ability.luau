@@ -14,10 +14,12 @@ local Ability = {}
 function Ability.start(remotes: any)
 	local gui = Theme.screenGui("Ability", 7)
 
+	local ABILITY_LABELS = { lunge = "LUNGE  [Q]", cloak = "CLOAK  [Q]" }
+
 	local button = Theme.button(gui, {
 		Size = UDim2.new(0, 150, 0, 54),
 		Position = UDim2.new(0.5, -75, 1, -80),
-		Text = "LUNGE  [Q]",
+		Text = "ABILITY  [Q]",
 		TextSize = 16,
 		BackgroundColor3 = Theme.Colors.Infected,
 		TextColor3 = Theme.Colors.Bg,
@@ -44,7 +46,8 @@ function Ability.start(remotes: any)
 	button.MouseButton1Click:Connect(activate)
 
 	remotes.on("AbilityState", function(state)
-		if state.ability ~= "lunge" then
+		local label = state.ability and ABILITY_LABELS[state.ability]
+		if label == nil then
 			hasAbility = false
 			button.Visible = false
 			return
@@ -53,6 +56,7 @@ function Ability.start(remotes: any)
 		button.Visible = true
 		ready = state.ready == true
 		if ready then
+			button.Text = label
 			cover.Visible = false
 			button.AutoButtonColor = true
 			button.BackgroundColor3 = Theme.Colors.Infected

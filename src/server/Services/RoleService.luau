@@ -317,8 +317,9 @@ function RoleService:_applyZombieClass(player: Player, character: Model, class: 
 	character:SetAttribute("ZombieClass", class.name)
 	self._deps.remotes.fireClient("HordeUpdate", player, { yourClass = class.name })
 	-- Tell the client whether this class has a player-activated ability (for the button).
+	local activated = (class.ability == "lunge" or class.ability == "cloak") and class.ability or nil
 	self._deps.remotes.fireClient("AbilityState", player, {
-		ability = class.ability == "lunge" and "lunge" or nil,
+		ability = activated,
 		cooldown = class.abilityCooldown or 0,
 		ready = true,
 	})
@@ -361,8 +362,46 @@ function RoleService:_applyZombieClass(player: Player, character: Model, class: 
 	end
 end
 
--- Player activated their zombie-class ability. Only "lunge" is player-triggered (scream is
--- passive); it applies a brief, anti-cheat-safe speed burst to run down fleeing survivors.
+-- Lunge: a brief, anti-cheat-safe absolute speed burst to run down fleeing survivors.
+function RoleService:_abilityLunge(player: Player, character: Model, humanoid: Humanoid, class: any)
+	local baseSpeed = GameConfig.Movement.BaseWalkSpeed * class.walkSpeedMult
+	humanoid.WalkSpeed = GameConfig.Lunge.Speed
+	task.delay(GameConfig.Lunge.Duration, function()
+		if self._roles[player] == "ZOMBIE" and player.Character == character and humanoid.Health > 0 then
+			humanoid.WalkSpeed = baseSpeed
+		end
+	end)
+end
+
+-- Cloak: fade the Stalker's body and hide its infection aura for a short window so it can
+-- sneak up. Server-set transparency replicates to everyone; no movement/anti-cheat impact.
+function RoleService:_abilityCloak(player: Player, character: Model, humanoid: Humanoid, _class: any)
+	local restore: { [BasePart]: number } = {}
+	for _, part in character:GetDescendants() do
+		if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+			restore[part] = part.Transparency
+			part.Transparency = GameConfig.Cloak.Transparency
+		elseif part:IsA("ParticleEmitter") and part.Name == "InfectionAura" then
+			part.Enabled = false
+		end
+	end
+	task.delay(GameConfig.Cloak.Duration, function()
+		if player.Character ~= character then
+			return
+		end
+		for part, original in restore do
+			if part.Parent ~= nil then
+				part.Transparency = original
+			end
+		end
+		local aura = character:FindFirstChild("InfectionAura", true)
+		if aura and aura:IsA("ParticleEmitter") and humanoid.Health > 0 then
+			aura.Enabled = true
+		end
+	end)
+end
+
+-- Player activated their zombie-class ability (lunge / cloak; scream is passive).
 function RoleService:useAbility(player: Player)
 	if not self._roundActive or self._roles[player] ~= "ZOMBIE" then
 		return
@@ -380,8 +419,9 @@ function RoleService:useAbility(player: Player)
 			break
 		end
 	end
-	if class == nil or class.ability ~= "lunge" then
-		return
+	local ability = class and class.ability
+	if ability ~= "lunge" and ability ~= "cloak" then
+		return -- no player-activated ability for this class
 	end
 	local cooldown = class.abilityCooldown or 8
 	local now = os.clock()
@@ -391,27 +431,24 @@ function RoleService:useAbility(player: Player)
 	end
 	self._abilityLastUse[player] = now
 
-	local baseSpeed = GameConfig.Movement.BaseWalkSpeed * class.walkSpeedMult
 	local h = humanoid :: Humanoid
-	h.WalkSpeed = GameConfig.Lunge.Speed
-	self._deps.remotes.fireClient("AbilityState", player, {
-		ability = "lunge",
-		cooldown = cooldown,
-		ready = false,
-	})
-	task.delay(GameConfig.Lunge.Duration, function()
-		-- Restore only if still this same zombie character.
-		if self._roles[player] == "ZOMBIE" and player.Character == character and h.Health > 0 then
-			h.WalkSpeed = baseSpeed
-		end
-	end)
+	if ability == "lunge" then
+		self:_abilityLunge(player, character :: Model, h, class)
+	else
+		self:_abilityCloak(player, character :: Model, h, class)
+	end
+	self._deps.remotes.fireClient(
+		"AbilityState",
+		player,
+		{ ability = ability, cooldown = cooldown, ready = false }
+	)
 	task.delay(cooldown, function()
 		if self._roles[player] == "ZOMBIE" and player.Parent ~= nil then
-			self._deps.remotes.fireClient("AbilityState", player, {
-				ability = "lunge",
-				cooldown = cooldown,
-				ready = true,
-			})
+			self._deps.remotes.fireClient(
+				"AbilityState",
+				player,
+				{ ability = ability, cooldown = cooldown, ready = true }
+			)
 		end
 	end)
 end

@@ -120,6 +120,15 @@ local GameConfig = {
 			ability = "lunge", -- player-activated speed burst to run down fleeing survivors
 			abilityCooldown = 8,
 		},
+		{
+			name = "Stalker",
+			hordeThreshold = 0.6,
+			maxHealth = 80,
+			walkSpeedMult = 1.2,
+			attacksToKill = 2,
+			ability = "cloak", -- brief semi-invisibility to sneak up on survivors
+			abilityCooldown = 12,
+		},
 	} :: { ZombieClass },
 
 	-- Lunge tunables. LungeSpeed is an ABSOLUTE walkspeed for the burst; kept under
@@ -127,6 +136,12 @@ local GameConfig = {
 	Lunge = {
 		Speed = 40,
 		Duration = 0.6,
+	},
+	-- Cloak: fade the Stalker (and hide its infection aura) for a short window. Not full
+	-- invisibility (survivors can still faintly see them) so it stays fair.
+	Cloak = {
+		Duration = 3,
+		Transparency = 0.75,
 	},
 
 	Rewards = {
