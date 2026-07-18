@@ -18,11 +18,13 @@ function RoleCard.start(remotes: any)
 		Visible = false,
 	})
 	Theme.corner(card, 16)
+	local cardStroke = Theme.stroke(card, Theme.Colors.PanelLight, 2, 0.2)
 	local title = Theme.label(card, {
 		Size = UDim2.new(1, 0, 0, 54),
 		Position = UDim2.new(0, 0, 0, 22),
 		Text = "",
-		TextSize = 34,
+		TextSize = 36,
+		Font = Theme.FontDisplay,
 	})
 	local subtitle = Theme.label(card, {
 		Size = UDim2.new(1, -40, 0, 44),
@@ -37,6 +39,7 @@ function RoleCard.start(remotes: any)
 	local function show(titleText: string, subtitleText: string, color: Color3, holdSeconds: number)
 		title.Text = titleText
 		title.TextColor3 = color
+		cardStroke.Color = color
 		subtitle.Text = subtitleText
 		card.BackgroundColor3 = Theme.Colors.Bg
 		card.BackgroundTransparency = 0.15

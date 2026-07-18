@@ -22,6 +22,7 @@ function HUD.start(remotes: any)
 		BackgroundTransparency = 0.25,
 	})
 	Theme.corner(topBar, 12)
+	Theme.stroke(topBar, Color3.fromRGB(60, 64, 78), 1, 0.4)
 	local stateLabel = Theme.label(topBar, {
 		Size = UDim2.new(1, 0, 0, 22),
 		Position = UDim2.new(0, 0, 0, 4),
@@ -33,7 +34,8 @@ function HUD.start(remotes: any)
 		Size = UDim2.new(1, 0, 0, 28),
 		Position = UDim2.new(0, 0, 0, 24),
 		Text = "--:--",
-		TextSize = 24,
+		TextSize = 26,
+		Font = Theme.FontDisplay,
 	})
 
 	-- Horde counter (left)
