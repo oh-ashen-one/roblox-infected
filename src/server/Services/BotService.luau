@@ -636,13 +636,13 @@ end
 
 -- Survivor bots shoot VISIBLE zombie bots (and only those — see _visibleThreats). Purely
 -- to make the battlefield feel alive; damage is applied without crediting any player.
-function BotService:_survivorGunfire(bot: Bot, now: number)
+function BotService:_survivorGunfire(bot: Bot, now: number, threats: { BasePart })
 	if now < bot.nextShotAt then
 		return
 	end
 	local target: BasePart? = nil
 	local bestDist = GameConfig.Bots.ShootRange
-	for _, threatRoot in self:_visibleThreats() do
+	for _, threatRoot in threats do
 		local d = (threatRoot.Position - bot.root.Position).Magnitude
 		if d < bestDist and self:_lineOfSight(bot, threatRoot.Position) then
 			target, bestDist = threatRoot, d
@@ -699,19 +699,21 @@ function BotService:_isolatedTarget(targets: { Target }): Target?
 	return best
 end
 
-function BotService:_stepBot(bot: Bot, now: number)
+-- `targets` (alive survivors) and `threats` (visible infected) are computed ONCE per tick
+-- in start() and shared across all bots, instead of each bot rebuilding them several times.
+function BotService:_stepBot(bot: Bot, now: number, targets: { Target }, threats: { BasePart })
 	if bot.humanoid.Health <= 0 then
 		return
 	end
 	local pos = bot.root.Position
 
 	if bot.role == "SURVIVOR" then
-		self:_survivorGunfire(bot, now)
+		self:_survivorGunfire(bot, now, threats)
 
 		-- Flee the nearest visible threat if it's close.
 		local threat: BasePart? = nil
 		local threatDist = GameConfig.Bots.FleeRadius
-		for _, threatRoot in self:_visibleThreats() do
+		for _, threatRoot in threats do
 			local d = (threatRoot.Position - pos).Magnitude
 			if d < threatDist and self:_lineOfSight(bot, threatRoot.Position) then
 				threat, threatDist = threatRoot, d
@@ -735,7 +737,7 @@ function BotService:_stepBot(bot: Bot, now: number)
 		if bot.personality == "grouper" then
 			-- Drift toward the centroid of nearby survivors.
 			local sum, count = Vector3.zero, 0
-			for _, t in self:_survivorTargets() do
+			for _, t in targets do
 				if t.root ~= bot.root and (t.pos - pos).Magnitude < GameConfig.Bots.GroupRadius then
 					sum += t.pos
 					count += 1
@@ -757,7 +759,6 @@ function BotService:_stepBot(bot: Bot, now: number)
 		self:_navigateTo(bot, bot.wanderTarget or pos, now, bot.baseSpeed)
 	else
 		-- Infected: chase (PZ stalks the most isolated survivor) and convert on contact.
-		local targets = self:_survivorTargets()
 		local target: Target? = if bot.role == "PATIENT_ZERO" then self:_isolatedTarget(targets) else nil
 		if target == nil then
 			local bestDist = math.huge
@@ -800,8 +801,11 @@ function BotService:start()
 			return
 		end
 		local now = os.clock()
+		-- Snapshot the shared world state once per tick (not once per bot per check).
+		local targets = self:_survivorTargets()
+		local threats = self:_visibleThreats()
 		for _, bot in self._bots do
-			self:_stepBot(bot, now)
+			self:_stepBot(bot, now, targets, threats)
 		end
 	end)
 end
