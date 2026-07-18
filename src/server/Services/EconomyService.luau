@@ -12,6 +12,7 @@ local GameConfig = require(Shared.GameConfig)
 local Rewards = require(Shared.Rewards)
 local SkinCatalog = require(Shared.SkinCatalog)
 local CrateRoll = require(Shared.CrateRoll)
+local LevelMath = require(Shared.LevelMath)
 
 local EconomyService = {}
 EconomyService.__index = EconomyService
@@ -100,9 +101,21 @@ function EconomyService:award(player: Player, event: string, won: boolean)
 	if self:_ownsGamePass(player, GameConfig.Products.GamePasses.XPBoost) then
 		xp = math.floor(xp * 1.5)
 	end
+	local oldXp = data.xp
 	data.coins += coins
 	data.xp += xp
 	self._roundEarnings[player] = (self._roundEarnings[player] or 0) + coins
+	-- Level-up: grant the milestone reward and tell the client to celebrate.
+	local levelUp = LevelMath.levelUpRewards(oldXp, data.xp)
+	if levelUp.levelsGained > 0 then
+		data.coins += levelUp.coins
+		data.crateKeys += levelUp.keys
+		self._deps.remotes.fireClient("LevelUp", player, {
+			level = levelUp.newLevel,
+			coins = levelUp.coins,
+			keys = levelUp.keys,
+		})
+	end
 	self._deps.dataService:sync(player)
 end
 

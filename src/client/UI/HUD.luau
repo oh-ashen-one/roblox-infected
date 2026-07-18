@@ -2,6 +2,12 @@
 -- In-round HUD: state banner + countdown timer, horde counter, kill feed,
 -- conversion alerts, coin balance.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local LevelMath = require(Shared.LevelMath)
+
 local Theme = require(script.Parent.Theme)
 
 local HUD = {}
@@ -59,6 +65,44 @@ function HUD.start(remotes: any)
 		Text = "0 coins",
 		TextSize = 15,
 		TextColor3 = Theme.Colors.Gold,
+	})
+
+	-- Level pill + XP bar (under the coins panel, right side)
+	local levelPill = Theme.frame(gui, {
+		Size = UDim2.new(0, 140, 0, 34),
+		Position = UDim2.new(1, -152, 0, 60),
+		BackgroundTransparency = 0.25,
+	})
+	Theme.corner(levelPill, 10)
+	local levelLabel = Theme.label(levelPill, {
+		Size = UDim2.new(1, -12, 0, 18),
+		Position = UDim2.new(0, 12, 0, 3),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Text = "LVL 1",
+		TextSize = 14,
+		TextColor3 = Theme.Colors.Survivor,
+	})
+	local xpBar = Theme.frame(levelPill, {
+		Size = UDim2.new(1, -24, 0, 6),
+		Position = UDim2.new(0, 12, 1, -10),
+		BackgroundColor3 = Theme.Colors.Bg,
+	})
+	Theme.corner(xpBar, 3)
+	local xpFill = Theme.frame(xpBar, {
+		Size = UDim2.new(0, 0, 1, 0),
+		BackgroundColor3 = Theme.Colors.Survivor,
+	})
+	Theme.corner(xpFill, 3)
+
+	-- Level-up toast
+	local toast = Theme.label(gui, {
+		Size = UDim2.new(0, 360, 0, 60),
+		Position = UDim2.new(0.5, -180, 0.28, 0),
+		Text = "",
+		TextSize = 30,
+		TextColor3 = Theme.Colors.Gold,
+		TextTransparency = 1,
+		TextStrokeTransparency = 0.4,
 	})
 
 	-- Kill feed (right column)
@@ -141,6 +185,26 @@ function HUD.start(remotes: any)
 
 	remotes.on("ProfileSync", function(profile)
 		coinsLabel.Text = ("%d coins"):format(profile.coins or 0)
+		local level, into, needed = LevelMath.progress(profile.xp or 0)
+		levelLabel.Text = ("LVL %d"):format(level)
+		xpFill.Size = UDim2.new(needed > 0 and math.clamp(into / needed, 0, 1) or 0, 0, 1, 0)
+	end)
+
+	remotes.on("LevelUp", function(payload)
+		local extra = payload.keys > 0
+				and ("  +%d coins, +%d key%s"):format(
+					payload.coins,
+					payload.keys,
+					payload.keys == 1 and "" or "s"
+				)
+			or ("  +%d coins"):format(payload.coins)
+		toast.Text = ("LEVEL %d!%s"):format(payload.level, extra)
+		toast.TextTransparency = 0
+		toast.TextStrokeTransparency = 0.4
+		TweenService:Create(toast, TweenInfo.new(2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+			TextTransparency = 1,
+			TextStrokeTransparency = 1,
+		}):Play()
 	end)
 
 	return {

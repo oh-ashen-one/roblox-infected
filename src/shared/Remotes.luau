@@ -72,6 +72,7 @@ local Specs: { [string]: Spec } = {
 	DailyClaimed = {}, -- confirmation of a granted daily reward
 	QuestStatus = {}, -- resolved daily/weekly quest list with progress for the client
 	RoundModifier = {}, -- active round modifier (banner + client lighting effects)
+	LevelUp = {}, -- fired when a player crosses a level threshold (toast + reward)
 }
 
 local Remotes = {}

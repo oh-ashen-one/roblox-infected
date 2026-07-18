@@ -30,6 +30,35 @@ function tests.progress_never_negative()
 	end
 end
 
+function tests.no_reward_when_level_unchanged()
+	local xp = LevelMath.xpForLevel(3)
+	local r = LevelMath.levelUpRewards(xp, xp + 1)
+	assert(r.levelsGained == 0 and r.coins == 0 and r.keys == 0)
+end
+
+function tests.level_up_grants_scaled_reward()
+	-- Crossing exactly into level 2.
+	local r = LevelMath.levelUpRewards(0, LevelMath.xpForLevel(2))
+	assert(r.newLevel == 2 and r.levelsGained == 1)
+	assert(r.coins == 100, "50 * level 2")
+end
+
+function tests.multiple_levels_sum_rewards()
+	-- Jump from level 1 straight to level 6 sums levels 2..6, with a key at level 5.
+	local r = LevelMath.levelUpRewards(0, LevelMath.xpForLevel(6))
+	assert(r.newLevel == 6 and r.levelsGained == 5)
+	local expectedCoins = 50 * (2 + 3 + 4 + 5 + 6)
+	assert(r.coins == expectedCoins, "sum of per-level coins")
+	assert(r.keys == 1, "one key for crossing level 5")
+end
+
+function tests.every_fifth_level_gives_a_key()
+	assert(LevelMath.rewardForLevel(5).keys == 1)
+	assert(LevelMath.rewardForLevel(10).keys == 1)
+	assert(LevelMath.rewardForLevel(7).keys == 0)
+	assert(LevelMath.rewardForLevel(1).coins == 0, "starting level pays nothing")
+end
+
 local RARITIES = {
 	{ name = "Common", weight = 55 },
 	{ name = "Rare", weight = 40 },
