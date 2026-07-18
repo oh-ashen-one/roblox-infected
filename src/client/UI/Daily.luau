@@ -37,7 +37,8 @@ function Daily.start(remotes: any)
 		Size = UDim2.new(1, -24, 0, 34),
 		Position = UDim2.new(0, 12, 0, 14),
 		Text = "DAILY REWARD",
-		TextSize = 24,
+		TextSize = 26,
+		Font = Theme.FontDisplay,
 		TextColor3 = Theme.Colors.Gold,
 	})
 	local streakLabel = Theme.label(panel, {

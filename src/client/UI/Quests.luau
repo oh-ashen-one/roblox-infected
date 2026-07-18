@@ -69,11 +69,14 @@ function Quests.start(remotes: any)
 		Visible = false,
 	})
 	Theme.corner(panel, 14)
+	Theme.gradient(panel, Theme.Colors.PanelLight, Theme.Colors.Panel, 90)
+	Theme.stroke(panel, Color3.fromRGB(60, 64, 78), 1, 0.3)
 	Theme.label(panel, {
 		Size = UDim2.new(1, -24, 0, 30),
 		Position = UDim2.new(0, 12, 0, 10),
 		Text = "QUESTS",
-		TextSize = 22,
+		TextSize = 24,
+		Font = Theme.FontDisplay,
 		TextXAlignment = Enum.TextXAlignment.Left,
 	})
 	local closeBtn = Theme.button(panel, {

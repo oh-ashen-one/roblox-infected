@@ -76,11 +76,14 @@ function Leaderboard.start(remotes: any)
 		Visible = false,
 	})
 	Theme.corner(panel, 14)
+	Theme.gradient(panel, Theme.Colors.PanelLight, Theme.Colors.Panel, 90)
+	Theme.stroke(panel, Color3.fromRGB(60, 64, 78), 1, 0.3)
 	Theme.label(panel, {
 		Size = UDim2.new(1, -24, 0, 30),
 		Position = UDim2.new(0, 12, 0, 10),
 		Text = "GLOBAL LEADERBOARD",
-		TextSize = 20,
+		TextSize = 22,
+		Font = Theme.FontDisplay,
 		TextXAlignment = Enum.TextXAlignment.Left,
 	})
 	local closeBtn = Theme.button(panel, {

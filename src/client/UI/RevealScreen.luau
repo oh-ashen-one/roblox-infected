@@ -31,7 +31,8 @@ function RevealScreen.start(remotes: any)
 		Size = UDim2.new(1, 0, 0, 50),
 		Position = UDim2.new(0, 0, 0, 20),
 		Text = "",
-		TextSize = 34,
+		TextSize = 36,
+		Font = Theme.FontDisplay,
 	})
 
 	-- Patient Zero unmask block.

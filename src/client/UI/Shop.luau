@@ -50,12 +50,15 @@ function Shop.start(remotes: any)
 		Visible = false,
 	})
 	Theme.corner(panel, 14)
+	Theme.gradient(panel, Theme.Colors.PanelLight, Theme.Colors.Panel, 90)
+	Theme.stroke(panel, Color3.fromRGB(60, 64, 78), 1, 0.3)
 
 	Theme.label(panel, {
 		Size = UDim2.new(1, 0, 0, 34),
 		Position = UDim2.new(0, 0, 0, 8),
 		Text = "SHOP & LOADOUT",
-		TextSize = 20,
+		TextSize = 22,
+		Font = Theme.FontDisplay,
 	})
 	local close = Theme.button(panel, {
 		Size = UDim2.new(0, 32, 0, 32),
