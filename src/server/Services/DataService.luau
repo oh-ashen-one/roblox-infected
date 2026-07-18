@@ -25,6 +25,13 @@ local PROFILE_TEMPLATE = {
 		daily = { period = -1, progress = {} :: { [string]: number }, claimed = {} :: { [string]: boolean } },
 		weekly = { period = -1, progress = {} :: { [string]: number }, claimed = {} :: { [string]: boolean } },
 	},
+	season = {
+		-- Time-boxed battle track; resets when the season id (derived from the day) changes.
+		id = -1,
+		xp = 0,
+		claimedFree = {} :: { [string]: boolean }, -- keyed by tostring(tier)
+		claimedPremium = {} :: { [string]: boolean },
+	},
 }
 
 export type Profile = typeof(PROFILE_TEMPLATE)

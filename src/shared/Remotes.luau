@@ -55,6 +55,10 @@ local Specs: { [string]: Spec } = {
 		validator = v.shape({ scope = v.oneOf({ "daily", "weekly" }), questId = v.str(64) }),
 		ratePerSecond = 5,
 	},
+	ClaimSeasonTier = {
+		validator = v.shape({ tier = v.integer(1, 30), track = v.oneOf({ "free", "premium" }) }),
+		ratePerSecond = 8,
+	},
 
 	-- Server -> Client (no validator/rate limit; server is trusted)
 	RoundState = {},
@@ -75,6 +79,7 @@ local Specs: { [string]: Spec } = {
 	RoundModifier = {}, -- active round modifier (banner + client lighting effects)
 	LevelUp = {}, -- fired when a player crosses a level threshold (toast + reward)
 	Leaderboard = {}, -- top wins/conversions for the leaderboard panel
+	SeasonStatus = {}, -- season-pass tier track + progress for the client
 }
 
 local Remotes = {}

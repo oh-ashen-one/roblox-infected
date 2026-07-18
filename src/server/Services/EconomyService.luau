@@ -61,6 +61,11 @@ function EconomyService:_prefetchGamePasses(player: Player)
 	end
 end
 
+-- Public read for other services (e.g. season-pass premium track). Cache-only, no yield.
+function EconomyService:ownsGamePass(player: Player, passId: number): boolean
+	return self:_ownsGamePass(player, passId)
+end
+
 function EconomyService:_ownsGamePass(player: Player, passId: number): boolean
 	if passId == 0 then
 		return false -- not created yet

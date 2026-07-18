@@ -70,7 +70,13 @@ local dataService = DataService.new({
 local economyService = EconomyService.new({ remotes = remotes, dataService = dataService })
 local monetizationService =
 	MonetizationService.new({ dataService = dataService, economyService = economyService })
-retentionService = RetentionService.new({ remotes = remotes, dataService = dataService })
+retentionService = RetentionService.new({
+	remotes = remotes,
+	dataService = dataService,
+	isPremium = function(player)
+		return economyService:ownsGamePass(player, GameConfig.Products.GamePasses.VIP)
+	end,
+})
 local leaderboardService = LeaderboardService.new({ remotes = remotes, dataService = dataService })
 local analyticsService = AnalyticsService.new()
 

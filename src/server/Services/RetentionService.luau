@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local DailyReward = require(Shared.DailyReward)
 local Quests = require(Shared.Quests)
+local SeasonPass = require(Shared.SeasonPass)
 
 local RetentionService = {}
 RetentionService.__index = RetentionService
@@ -18,6 +19,8 @@ export type Deps = {
 	dataService: any,
 	-- Injectable clock so tests / Studio can control "today"; defaults to os.time.
 	now: (() -> number)?,
+	-- Whether the player owns the premium season track (VIP). Defaults to false.
+	isPremium: ((player: Player) -> boolean)?,
 }
 
 function RetentionService.new(deps: Deps)
@@ -143,6 +146,14 @@ function RetentionService:recordEvent(player: Player, metric: string, amount: nu
 	if changed then
 		self:pushQuests(player)
 	end
+
+	-- Season XP from the same event.
+	local seasonXp = SeasonPass.xpForEvent(metric) * amount
+	if seasonXp > 0 then
+		self:_ensureSeason(data)
+		data.season.xp += seasonXp
+		self:pushSeason(player)
+	end
 end
 
 function RetentionService:claimQuest(player: Player, scope: string, questId: string)
@@ -175,6 +186,89 @@ function RetentionService:claimQuest(player: Player, scope: string, questId: str
 	self:pushQuests(player)
 end
 
+-- Season pass -------------------------------------------------------------------
+
+function RetentionService:_ensureSeason(data: any)
+	local id = SeasonPass.seasonId(self:_today())
+	if data.season.id ~= id then
+		data.season.id = id
+		data.season.xp = 0
+		data.season.claimedFree = {}
+		data.season.claimedPremium = {}
+	end
+end
+
+function RetentionService:_isPremium(player: Player): boolean
+	return self._deps.isPremium ~= nil and self._deps.isPremium(player) == true
+end
+
+function RetentionService:pushSeason(player: Player)
+	local data = self._deps.dataService:get(player)
+	if data == nil then
+		return
+	end
+	self:_ensureSeason(data)
+	local tier, into, span = SeasonPass.progress(data.season.xp)
+	local premium = self:_isPremium(player)
+	local tiers = {}
+	for t = 1, SeasonPass.MaxTier do
+		local reward = SeasonPass.rewardAt(t)
+		local key = tostring(t)
+		table.insert(tiers, {
+			tier = t,
+			reached = tier >= t,
+			free = reward.free,
+			premium = reward.premium,
+			freeClaimed = data.season.claimedFree[key] == true,
+			premiumClaimed = data.season.claimedPremium[key] == true,
+			freeClaimable = tier >= t and data.season.claimedFree[key] ~= true,
+			premiumClaimable = tier >= t and premium and data.season.claimedPremium[key] ~= true,
+		})
+	end
+	self._deps.remotes.fireClient("SeasonStatus", player, {
+		id = data.season.id,
+		tier = tier,
+		into = into,
+		span = span,
+		premium = premium,
+		maxTier = SeasonPass.MaxTier,
+		tiers = tiers,
+	})
+end
+
+function RetentionService:claimSeasonTier(player: Player, tier: number, track: string)
+	local data = self._deps.dataService:get(player)
+	if data == nil then
+		return
+	end
+	self:_ensureSeason(data)
+	local reached = SeasonPass.tierForXp(data.season.xp)
+	if tier < 1 or tier > SeasonPass.MaxTier or reached < tier then
+		return
+	end
+	local reward = SeasonPass.rewardAt(tier)
+	local key = tostring(tier)
+	local payout
+	if track == "premium" then
+		if not self:_isPremium(player) or data.season.claimedPremium[key] == true then
+			return
+		end
+		data.season.claimedPremium[key] = true
+		payout = reward.premium
+	else
+		if data.season.claimedFree[key] == true then
+			return
+		end
+		data.season.claimedFree[key] = true
+		payout = reward.free
+	end
+	data.coins += payout.coins
+	data.crateKeys += payout.keys
+	data.pzTokens += payout.pzTokens
+	self._deps.dataService:sync(player)
+	self:pushSeason(player)
+end
+
 function RetentionService:markTutorialSeen(player: Player)
 	local data = self._deps.dataService:get(player)
 	if data and not data.seenTutorial then
@@ -187,6 +281,7 @@ end
 function RetentionService:onPlayerReady(player: Player)
 	self:pushStatus(player)
 	self:pushQuests(player)
+	self:pushSeason(player)
 end
 
 function RetentionService:start()
@@ -198,6 +293,9 @@ function RetentionService:start()
 	end)
 	self._deps.remotes.onValidated("MarkTutorialSeen", function(player)
 		self:markTutorialSeen(player)
+	end)
+	self._deps.remotes.onValidated("ClaimSeasonTier", function(player, payload)
+		self:claimSeasonTier(player, payload.tier, payload.track)
 	end)
 	-- Any players already in (Studio start / hot reload) get their status pushed.
 	for _, player in Players:GetPlayers() do
