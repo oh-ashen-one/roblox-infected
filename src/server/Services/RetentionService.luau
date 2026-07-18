@@ -175,6 +175,14 @@ function RetentionService:claimQuest(player: Player, scope: string, questId: str
 	self:pushQuests(player)
 end
 
+function RetentionService:markTutorialSeen(player: Player)
+	local data = self._deps.dataService:get(player)
+	if data and not data.seenTutorial then
+		data.seenTutorial = true
+		self._deps.dataService:sync(player)
+	end
+end
+
 -- Called by DataService once a player's profile is ready.
 function RetentionService:onPlayerReady(player: Player)
 	self:pushStatus(player)
@@ -187,6 +195,9 @@ function RetentionService:start()
 	end)
 	self._deps.remotes.onValidated("ClaimQuest", function(player, payload)
 		self:claimQuest(player, payload.scope, payload.questId)
+	end)
+	self._deps.remotes.onValidated("MarkTutorialSeen", function(player)
+		self:markTutorialSeen(player)
 	end)
 	-- Any players already in (Studio start / hot reload) get their status pushed.
 	for _, player in Players:GetPlayers() do

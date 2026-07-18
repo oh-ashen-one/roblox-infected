@@ -17,6 +17,7 @@ local PROFILE_TEMPLATE = {
 	receipts = {} :: { [string]: boolean }, -- processed dev-product receipts (idempotency)
 	pzTokens = 0,
 	crateKeys = 0, -- earned keys (daily rewards, quests) that open crates without coins
+	seenTutorial = false, -- has the player seen the first-time onboarding overlay
 	daily = { lastClaimDay = 0, streak = 0 }, -- login-streak reward state
 	quests = {
 		-- Per-scope progress; which quests are assigned is derived deterministically from
@@ -61,6 +62,7 @@ function DataService:sync(player: Player)
 			stats = data.stats,
 			pzTokens = data.pzTokens,
 			crateKeys = data.crateKeys,
+			seenTutorial = data.seenTutorial,
 		})
 	end
 end

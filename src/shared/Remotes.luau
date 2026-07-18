@@ -50,6 +50,7 @@ local Specs: { [string]: Spec } = {
 		ratePerSecond = 4,
 	},
 	ClaimDaily = { validator = nil, ratePerSecond = 2 }, -- claim today's login reward
+	MarkTutorialSeen = { validator = nil, ratePerSecond = 2 }, -- FTUE overlay dismissed
 	ClaimQuest = {
 		validator = v.shape({ scope = v.oneOf({ "daily", "weekly" }), questId = v.str(64) }),
 		ratePerSecond = 5,
