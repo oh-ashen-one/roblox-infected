@@ -21,6 +21,7 @@ local EndgameService = require(script.Services.EndgameService)
 local BotService = require(script.Services.BotService)
 local RetentionService = require(script.Services.RetentionService)
 local LeaderboardService = require(script.Services.LeaderboardService)
+local AnalyticsService = require(script.Services.AnalyticsService)
 
 -- Fast timers in Studio so a full round loop plays out in under a minute of testing.
 if game:GetService("RunService"):IsStudio() then
@@ -71,6 +72,7 @@ local monetizationService =
 	MonetizationService.new({ dataService = dataService, economyService = economyService })
 retentionService = RetentionService.new({ remotes = remotes, dataService = dataService })
 local leaderboardService = LeaderboardService.new({ remotes = remotes, dataService = dataService })
+local analyticsService = AnalyticsService.new()
 
 -- Round modifiers: roll one (weighted) at round start, apply via global levers, broadcast
 -- for the client banner + lighting, and clear at intermission.
@@ -126,6 +128,7 @@ roleService = RoleService.new({
 		if killer and retentionService then
 			retentionService:recordEvent(killer, "convert", 1)
 		end
+		analyticsService:onConversion(killer)
 		local victimRoot = victim.Character and victim.Character:FindFirstChild("HumanoidRootPart")
 		remotes.fireAllClients("ConversionAlert", {
 			victimName = victim.DisplayName,
@@ -218,7 +221,9 @@ roundService = RoundService.new({
 		combatService:resetRound()
 		endgameService:resetRound()
 		mapService:loadVotedMap()
-		applyModifier(pickModifier())
+		local roundMod = pickModifier()
+		applyModifier(roundMod)
+		analyticsService:onRoundStart(#playersInRound, roundMod.id)
 
 		-- Decide whether the Patient Zero is a human or a bot. With one human and
 		-- several bots, the human is usually a survivor being hunted (more fun solo),
@@ -277,6 +282,7 @@ roundService = RoundService.new({
 		roleService:endRound()
 		botService:clear()
 		leaderboardService:onRoundEnd(Players:GetPlayers())
+		analyticsService:onRoundEnd(winner, #survivorNames)
 	end,
 	onIntermission = function()
 		-- Reset any round modifier (gravity/lighting/multiplier) back to normal.
