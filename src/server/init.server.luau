@@ -85,6 +85,9 @@ roleService = RoleService.new({
 	onConversion = function(victim: Player, killer: Player?)
 		roundService:recordConversion()
 		economyService:onConversion(killer)
+		if killer and retentionService then
+			retentionService:recordEvent(killer, "convert", 1)
+		end
 		local victimRoot = victim.Character and victim.Character:FindFirstChild("HumanoidRootPart")
 		remotes.fireAllClients("ConversionAlert", {
 			victimName = victim.DisplayName,
@@ -128,9 +131,11 @@ botService = BotService.new({
 	end,
 	onBotKilledByHuman = function(killer: Player)
 		economyService:onZombieKilled(killer)
+		retentionService:recordEvent(killer, "kill", 1)
 	end,
 	onBotConvertedByHuman = function(killer: Player)
 		economyService:onConversion(killer)
+		retentionService:recordEvent(killer, "convert", 1)
 	end,
 	onConversionOccurred = function()
 		roundService:recordConversion()
@@ -149,6 +154,7 @@ local combatService = CombatService.new({
 	end,
 	onZombieKilled = function(killer: Player, _victim: Player)
 		economyService:onZombieKilled(killer)
+		retentionService:recordEvent(killer, "kill", 1)
 	end,
 	isLastStand = function(player: Player)
 		return endgameService:isLastStand(player)
@@ -204,6 +210,15 @@ roundService = RoundService.new({
 			table.insert(survivorNames, botName)
 		end
 		economyService:onRoundEnd(winner, survivors, Players:GetPlayers())
+		for _, survivor in survivors do
+			retentionService:recordEvent(survivor, "survive", 1)
+			if winner == "SURVIVORS" then
+				retentionService:recordEvent(survivor, "win", 1)
+			end
+		end
+		for _, roundPlayer in Players:GetPlayers() do
+			retentionService:recordEvent(roundPlayer, "playRounds", 1)
+		end
 		local earnings = {}
 		for player, coins in economyService:roundEarnings() do
 			earnings[tostring(player.UserId)] = coins

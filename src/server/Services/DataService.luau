@@ -18,6 +18,12 @@ local PROFILE_TEMPLATE = {
 	pzTokens = 0,
 	crateKeys = 0, -- earned keys (daily rewards, quests) that open crates without coins
 	daily = { lastClaimDay = 0, streak = 0 }, -- login-streak reward state
+	quests = {
+		-- Per-scope progress; which quests are assigned is derived deterministically from
+		-- the period + userId (see shared/Quests), so only progress + claim state persist.
+		daily = { period = -1, progress = {} :: { [string]: number }, claimed = {} :: { [string]: boolean } },
+		weekly = { period = -1, progress = {} :: { [string]: number }, claimed = {} :: { [string]: boolean } },
+	},
 }
 
 export type Profile = typeof(PROFILE_TEMPLATE)

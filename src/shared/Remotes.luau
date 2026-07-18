@@ -50,6 +50,10 @@ local Specs: { [string]: Spec } = {
 		ratePerSecond = 4,
 	},
 	ClaimDaily = { validator = nil, ratePerSecond = 2 }, -- claim today's login reward
+	ClaimQuest = {
+		validator = v.shape({ scope = v.oneOf({ "daily", "weekly" }), questId = v.str(64) }),
+		ratePerSecond = 5,
+	},
 
 	-- Server -> Client (no validator/rate limit; server is trusted)
 	RoundState = {},
@@ -66,6 +70,7 @@ local Specs: { [string]: Spec } = {
 	HitConfirm = {},
 	DailyStatus = {}, -- current login-streak status + payout for the client popup
 	DailyClaimed = {}, -- confirmation of a granted daily reward
+	QuestStatus = {}, -- resolved daily/weekly quest list with progress for the client
 }
 
 local Remotes = {}

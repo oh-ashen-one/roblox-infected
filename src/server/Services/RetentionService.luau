@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local DailyReward = require(Shared.DailyReward)
+local Quests = require(Shared.Quests)
 
 local RetentionService = {}
 RetentionService.__index = RetentionService
@@ -68,19 +69,130 @@ function RetentionService:claim(player: Player)
 	self:pushStatus(player)
 end
 
+-- Quests ------------------------------------------------------------------------
+
+function RetentionService:_periodFor(scope: string): number
+	local today = self:_today()
+	return scope == "weekly" and Quests.periodWeekly(today) or Quests.periodDaily(today)
+end
+
+-- Roll a scope over to the current period, clearing progress + claims if it changed.
+function RetentionService:_ensurePeriod(data: any, scope: string)
+	local store = data.quests[scope]
+	local period = self:_periodFor(scope)
+	if store.period ~= period then
+		store.period = period
+		store.progress = {}
+		store.claimed = {}
+	end
+end
+
+-- Build the resolved quest list the client renders (quest def + progress + claimable).
+function RetentionService:_resolvedScope(player: Player, data: any, scope: string): { any }
+	self:_ensurePeriod(data, scope)
+	local store = data.quests[scope]
+	local out = {}
+	for _, quest in Quests.assignmentFor(scope, store.period, player.UserId) do
+		local state = Quests.state(quest, store.progress[quest.id] or 0, store.claimed[quest.id] == true)
+		table.insert(out, {
+			id = quest.id,
+			desc = quest.desc,
+			target = quest.target,
+			progress = state.progress,
+			claimable = state.claimable,
+			claimed = store.claimed[quest.id] == true,
+			coins = quest.coins,
+			keys = quest.keys,
+			xp = quest.xp,
+		})
+	end
+	return out
+end
+
+function RetentionService:pushQuests(player: Player)
+	local data = self._deps.dataService:get(player)
+	if data == nil then
+		return
+	end
+	self._deps.remotes.fireClient("QuestStatus", player, {
+		daily = self:_resolvedScope(player, data, "daily"),
+		weekly = self:_resolvedScope(player, data, "weekly"),
+	})
+end
+
+-- Increment quest progress for a metric event (convert/kill/win/survive/playRounds).
+function RetentionService:recordEvent(player: Player, metric: string, amount: number)
+	local data = self._deps.dataService:get(player)
+	if data == nil then
+		return
+	end
+	local changed = false
+	for _, scope in { "daily", "weekly" } do
+		self:_ensurePeriod(data, scope)
+		local store = data.quests[scope]
+		for _, quest in Quests.assignmentFor(scope, store.period, player.UserId) do
+			if quest.metric == metric and (store.claimed[quest.id] ~= true) then
+				local current = store.progress[quest.id] or 0
+				if current < quest.target then
+					store.progress[quest.id] = math.min(quest.target, current + amount)
+					changed = true
+				end
+			end
+		end
+	end
+	if changed then
+		self:pushQuests(player)
+	end
+end
+
+function RetentionService:claimQuest(player: Player, scope: string, questId: string)
+	local data = self._deps.dataService:get(player)
+	if data == nil then
+		return
+	end
+	self:_ensurePeriod(data, scope)
+	local store = data.quests[scope]
+	-- The quest must be one currently assigned to this player.
+	local quest = nil
+	for _, q in Quests.assignmentFor(scope, store.period, player.UserId) do
+		if q.id == questId then
+			quest = q
+			break
+		end
+	end
+	if quest == nil then
+		return
+	end
+	local state = Quests.state(quest, store.progress[quest.id] or 0, store.claimed[quest.id] == true)
+	if not state.claimable then
+		return
+	end
+	store.claimed[quest.id] = true
+	data.coins += quest.coins
+	data.xp += quest.xp
+	data.crateKeys += quest.keys
+	self._deps.dataService:sync(player)
+	self:pushQuests(player)
+end
+
 -- Called by DataService once a player's profile is ready.
 function RetentionService:onPlayerReady(player: Player)
 	self:pushStatus(player)
+	self:pushQuests(player)
 end
 
 function RetentionService:start()
 	self._deps.remotes.onValidated("ClaimDaily", function(player)
 		self:claim(player)
 	end)
+	self._deps.remotes.onValidated("ClaimQuest", function(player, payload)
+		self:claimQuest(player, payload.scope, payload.questId)
+	end)
 	-- Any players already in (Studio start / hot reload) get their status pushed.
 	for _, player in Players:GetPlayers() do
 		if self._deps.dataService:get(player) ~= nil then
 			self:pushStatus(player)
+			self:pushQuests(player)
 		end
 	end
 end
