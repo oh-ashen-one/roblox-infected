@@ -17,12 +17,15 @@ function MapVote.start(remotes: any)
 		Visible = false,
 	})
 	Theme.corner(panel, 12)
+	Theme.gradient(panel, Theme.Colors.PanelLight, Theme.Colors.Panel, 90)
+	Theme.stroke(panel, Color3.fromRGB(60, 64, 78), 1, 0.35)
 	Theme.label(panel, {
 		Size = UDim2.new(1, 0, 0, 22),
 		Position = UDim2.new(0, 0, 0, 6),
 		Text = "VOTE NEXT MAP",
-		TextSize = 13,
-		TextColor3 = Theme.Colors.TextDim,
+		TextSize = 14,
+		Font = Theme.FontDisplay,
+		TextColor3 = Theme.Colors.Gold,
 	})
 
 	local buttons = {}
