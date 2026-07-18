@@ -257,14 +257,20 @@ roundService = RoundService.new({
 			retentionService:recordEvent(roundPlayer, "playRounds", 1)
 		end
 		local earnings = {}
+		local mvpName, mvpCoins = nil, -1
 		for player, coins in economyService:roundEarnings() do
 			earnings[tostring(player.UserId)] = coins
+			if coins > mvpCoins then
+				mvpName, mvpCoins = player.DisplayName, coins
+			end
 		end
 		remotes.fireAllClients("RevealScreen", {
 			winner = winner,
 			patientZeroName = originalPZ and originalPZ.name or "?",
 			survivors = survivorNames,
 			earnings = earnings,
+			mvpName = mvpName,
+			mvpCoins = mvpCoins >= 0 and mvpCoins or nil,
 		})
 		roleService:endRound()
 		botService:clear()
