@@ -14,19 +14,34 @@ strangers (16+) and runs on Roblox's live public infrastructure. A full multipla
 round showing conversions just needs 2+ players in the server (prod config; Studio
 fast-timers not in play live).
 
-# ⚠️ Bots + lobby update built & committed, NOT YET on the live game
+# 🚧 "1000×" upgrade in progress (GOAL-1000X.md) — built + CI-green, awaiting a Studio publish
 
-Added solo-play **bots** (fill lobby to 8, get roles, wander/hunt/convert, shot by
-guns / converted by knife) and fixed the **empty-baseplate** (a lobby map now always
-loads). Built, tested (37 green), headless-verified, committed + pushed.
+Executing GOAL-1000X.md. Shipped to `main` (CI green, 50 tests), NOT yet pushed to the
+live Roblox place — that needs a Studio publish from the owner account (see below):
 
-**Blocked pushing it live by an ACCOUNT MISMATCH:** Roblox Studio on this machine is
-signed into `solashenone1`, but the published INFECTED game is owned by `solashenone`
-(the account the web/Chrome session + eligibility verification are on). Studio can't
-publish an update to a game it doesn't own — INFECTED doesn't appear in solashenone1's
-cloud experiences. To ship the bot update: sign Studio into `solashenone`, then
-`rojo serve` + connect the Rojo plugin (or File → Publish) to overwrite the place.
-The currently LIVE public game still works — it just doesn't have bots yet.
+- **Phase A — game-feel juice:** trauma camera shake + FOV punch, floating damage numbers,
+  muzzle flash + light, impact spray, world-space green conversion bursts, full-screen
+  INFECTED takeover (flash + vignette + stinger), animated hitmarker (skull on kill),
+  green knife trail, gamepad haptics, and a tension music director (ramps by infected
+  fraction, last-stand swap; RoundMusic/LastStandMusic ids still to be dropped in).
+- **Phase B — smart bots:** PathfindingService navigation (paths around walls, stuck
+  recovery), line-of-sight, difficulty tiers + personalities, survivors roam/group/flee
+  and shoot back at visible zombies, infected chase, bot PZ stalks the most isolated
+  survivor. Hidden PZ never leaks to bot senses.
+- **Phase C — retention:** daily login-streak rewards, daily/weekly quests
+  (deterministic rotation, progress tracked from combat/round events), earned crate keys
+  with a Shop "USE KEY" sink. New RetentionService + shared DailyReward/Quests modules.
+
+**Remaining Phase A polish:** ragdoll death physics (deferred — can't verify headlessly).
+**Still to build:** Phase C season pass + cosmetic depth; Phases D–H (more maps + special
+infected + round modifiers; parties/leaderboards/share-screen; FTUE; LiveConfigService +
+analytics + anti-cheat/perf; UI overhaul).
+
+**To ship the above to the live game:** open the repo in Roblox Studio signed into the
+OWNER account `solashenone` (not `solashenone1`), `rojo serve` + connect the Rojo plugin
+(or File → Publish) to overwrite place 78267419085369. The currently LIVE public game
+keeps working; it just doesn't have these upgrades yet. Recommended: playtest first
+(Test → Clients/Servers) to feel the juice + watch the bots path around the map.
 
 # Build status vs Definition of Done
 
