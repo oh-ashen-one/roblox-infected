@@ -49,10 +49,18 @@ live Roblox place — that needs a Studio publish from the owner account (see be
 - **Phase H — UI overhaul:** theme glow-up + polished panels across HUD/shop/quests/
   leaderboard/season/reveal/map-vote/role-card.
 
-**Runtime validation status:** all of the above passes static CI (stylua/selene/**72** Lune
-unit tests/rojo build) but NONE has been playtested in Studio yet. A Studio playtest is now
-the highest-value next step — it de-risks the bot pathfinding, combat feel, and the new UI
-in one pass, and is required before publishing.
+**Runtime validation status:** static CI green (stylua/selene/**72** Lune unit tests/rojo
+build). **Headless boot check PASSES** (`run-in-roblox` + `RunService:Run()`, see
+`tests/studio-smoke.lua`): the server boots, remotes are created, a lobby map loads, and
+**0 script errors on boot** — so none of the 17 slices' server wiring crashes at startup.
+A hands-on Studio playtest (client UI + bots pathing + combat feel) is still the remaining
+validation before/with publishing.
+
+**Publishing headlessly (no Studio):** `scripts/publish.sh` ships the current build to the
+live place via Roblox Open Cloud — you create an Open Cloud API key (Place Management,
+write, universe 10518289514) once, put it in `ROBLOX_API_KEY` or
+`~/.config/infected/secrets.env`, and run the script. Overwrites the live public game, so
+playtest first.
 
 **Remaining (needs a playtest to build responsibly, then publish):**
 - Phase D: special-infected abilities (lunge/screamer/etc.) + 2–3 more maps
