@@ -74,6 +74,7 @@ local Specs: { [string]: Spec } = {
 	QuestStatus = {}, -- resolved daily/weekly quest list with progress for the client
 	RoundModifier = {}, -- active round modifier (banner + client lighting effects)
 	LevelUp = {}, -- fired when a player crosses a level threshold (toast + reward)
+	Leaderboard = {}, -- top wins/conversions for the leaderboard panel
 }
 
 local Remotes = {}

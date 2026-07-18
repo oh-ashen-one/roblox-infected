@@ -20,6 +20,7 @@ local MonetizationService = require(script.Services.MonetizationService)
 local EndgameService = require(script.Services.EndgameService)
 local BotService = require(script.Services.BotService)
 local RetentionService = require(script.Services.RetentionService)
+local LeaderboardService = require(script.Services.LeaderboardService)
 
 -- Fast timers in Studio so a full round loop plays out in under a minute of testing.
 if game:GetService("RunService"):IsStudio() then
@@ -69,6 +70,7 @@ local economyService = EconomyService.new({ remotes = remotes, dataService = dat
 local monetizationService =
 	MonetizationService.new({ dataService = dataService, economyService = economyService })
 retentionService = RetentionService.new({ remotes = remotes, dataService = dataService })
+local leaderboardService = LeaderboardService.new({ remotes = remotes, dataService = dataService })
 
 -- Round modifiers: roll one (weighted) at round start, apply via global levers, broadcast
 -- for the client banner + lighting, and clear at intermission.
@@ -274,6 +276,7 @@ roundService = RoundService.new({
 		})
 		roleService:endRound()
 		botService:clear()
+		leaderboardService:onRoundEnd(Players:GetPlayers())
 	end,
 	onIntermission = function()
 		-- Reset any round modifier (gravity/lighting/multiplier) back to normal.
@@ -295,6 +298,7 @@ monetizationService:start()
 endgameService:start()
 botService:start()
 retentionService:start()
+leaderboardService:start()
 
 -- Load a lobby map immediately so the very first pre-round moment isn't an empty
 -- baseplate.
