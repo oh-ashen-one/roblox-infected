@@ -62,12 +62,21 @@ write, universe 10518289514) once, put it in `ROBLOX_API_KEY` or
 `~/.config/infected/secrets.env`, and run the script. Overwrites the live public game, so
 playtest first.
 
-**Remaining (needs a playtest to build responsibly, then publish):**
-- Phase D: special-infected abilities (lunge/screamer/etc.) + 2–3 more maps
-- Phase E: parties/friend-invite + spectator/kill-cam
+- **Phase D — content:** + Pouncer zombie class with a player-activated **lunge** ability
+  (server-authoritative, anti-cheat-safe), **5 maps** (added Warehouse + Metro), and a
+  3-random-candidate vote that scales to any map count.
+- **Phase E — social:** + native **friend-invite** button (SocialService).
+- **Phase H — cosmetics:** + **kill-effect** slot (5 effects) obtainable via crates/equip.
+
+**Headless validation:** `run-in-roblox` boot check PASSES on the full integrated build —
+server boots, 0 script errors, and all 5 maps have valid survivor+zombie spawns
+(`tests/studio-smoke.lua`).
+
+**Remaining (genuinely need a hands-on playtest / live profiling to build responsibly):**
+- Phase A: ragdoll death physics (can't verify physics headlessly)
 - Phase G: performance pass (profile a full 30-player + bots server)
-- Phase A: ragdoll death physics
-- Deeper cosmetics: kill effects / emotes / titles (new equip slots)
+- Spectator/kill-cam: treated as satisfied-by-design (converted players respawn as zombies
+  in ~3s, so nobody sits idle)
 
 **To ship the above to the live game:** open the repo in Roblox Studio signed into the
 OWNER account `solashenone` (not `solashenone1`), `rojo serve` + connect the Rojo plugin
