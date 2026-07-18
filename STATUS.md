@@ -88,15 +88,20 @@ Additional gap-closures after the first pass:
 - **Phase H accessibility:** independent Music/SFX sliders, **colorblind mode**,
   **reduced-motion**, **UI-size (text-scale)** slider, working VFX toggle.
 
-**All 8 phases are built, headless-validated (76 unit tests + boot check), and pushed.**
-The only work left is inherently hands-on/live or asset-dependent:
-- **Publish to the live place** — user-gated (Open Cloud API key via `scripts/publish.sh`,
-  or Studio). Deferred by choice.
-- Perf *numeric tuning* (streaming radii, mobile framerate) — needs a live 30-player profile.
-- Ragdoll + kill-effect *visual polish* — tunable once seen in a playtest (mechanisms ship
-  safe).
-- Deferred extras: control-remap (large), emotes (need uploaded animation assets), full
-  party matchmaking (reserved servers).
+Final closures:
+- **Phase C/H:** nametag **titles** (level-unlocked, shown over the head to everyone).
+- **Phase G perf:** bot AI snapshots world-state once per tick (fewer allocations).
+- **Phase H accessibility (complete):** SFX/music sliders, colorblind mode, reduced-motion,
+  UI-size (text scale), **control remapping** (rebind panel + Keybinds module).
+
+**All 8 phases are built, headless-validated (84 unit tests + boot check), and pushed.**
+The only remaining items are hard-blocked on things I cannot do autonomously:
+- **Publish to the live place** — needs a Roblox Open Cloud API key (verified none exists on
+  this machine; only the owner can mint one) via `scripts/publish.sh`, or a Studio publish.
+- **Emotes** — require animation assets uploaded to the Roblox account; can't create/upload.
+- **Full party matchmaking** — reserved servers + live multiplayer testing (friend *invite*
+  already ships).
+- Perf *numeric tuning* + ragdoll/effect *visual polish* — need a live playtest/profile.
 
 **To ship the above to the live game:** open the repo in Roblox Studio signed into the
 OWNER account `solashenone` (not `solashenone1`), `rojo serve` + connect the Rojo plugin
