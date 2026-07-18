@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared.GameConfig)
+local AntiCheatMath = require(Shared.AntiCheatMath)
 
 local KICK_THRESHOLD = 12 -- combined flags before kick
 local SNAP_THRESHOLD = 3 -- movement flags before we start snapping back
@@ -49,13 +50,22 @@ function AntiCheatService:_checkPlayer(player: Player, interval: number)
 	-- Horizontal displacement only: falling is legitimate vertical speed.
 	local delta = pos - last
 	local horizontal = Vector3.new(delta.X, 0, delta.Z).Magnitude
-	local maxLegit = GameConfig.Movement.MaxToleratedSpeed * interval
+	local verdict = AntiCheatMath.classify(
+		horizontal,
+		interval,
+		GameConfig.Movement.MaxToleratedSpeed,
+		GameConfig.Movement.TeleportFlagStuds
+	)
 
-	if horizontal > math.max(maxLegit, GameConfig.Movement.TeleportFlagStuds * interval) then
+	if verdict == "teleport" then
+		-- A hard instantaneous jump: snap back immediately and count it heavily.
+		self._movementFlags[player] = (self._movementFlags[player] or 0) + 2
+		root.CFrame = CFrame.new(last)
+	elseif verdict == "speed" then
 		local flags = (self._movementFlags[player] or 0) + 1
 		self._movementFlags[player] = flags
 		if flags >= SNAP_THRESHOLD then
-			root.CFrame = CFrame.new(last) -- snap back
+			root.CFrame = CFrame.new(last) -- snap back after repeated speed flags
 		end
 	end
 end
