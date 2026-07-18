@@ -24,8 +24,8 @@ function Settings.start()
 	})
 
 	local panel = Theme.frame(gui, {
-		Size = UDim2.new(0, 300, 0, 372),
-		Position = UDim2.new(0.5, -150, 0.5, -186),
+		Size = UDim2.new(0, 300, 0, 428),
+		Position = UDim2.new(0.5, -150, 0.5, -214),
 		BackgroundTransparency = 0.05,
 		Visible = false,
 	})
@@ -116,6 +116,25 @@ function Settings.start()
 	sliderRow(3, "SFX VOLUME", sfxGroup.Volume, function(fraction)
 		sfxGroup.Volume = fraction
 	end)
+	-- UI SIZE: scale the whole interface (accessibility / readability) by adding a UIScale to
+	-- every ScreenGui. Applies to existing and future GUIs.
+	sliderRow(4, "UI SIZE", 0.28, function(fraction)
+		local scale = 0.8 + fraction * 0.7 -- 0.8 .. 1.5
+		local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+		if playerGui == nil then
+			return
+		end
+		for _, screen in playerGui:GetChildren() do
+			if screen:IsA("ScreenGui") then
+				local uiScale = screen:FindFirstChildOfClass("UIScale")
+				if uiScale == nil then
+					uiScale = Instance.new("UIScale")
+					uiScale.Parent = screen
+				end
+				uiScale.Scale = scale
+			end
+		end
+	end)
 
 	-- Toggle buttons
 	local function toggleButton(
@@ -140,14 +159,14 @@ function Settings.start()
 		return button
 	end
 
-	toggleButton(210, "COLORBLIND MODE: ON", "COLORBLIND MODE: OFF", false, function(on)
+	toggleButton(262, "COLORBLIND MODE: ON", "COLORBLIND MODE: OFF", false, function(on)
 		-- Juice reads this to shift infection cues to a colorblind-distinct hue.
 		LocalPlayer:SetAttribute("ColorblindMode", on)
 	end)
-	toggleButton(248, "INFECTION VFX: ON", "INFECTION VFX: OFF", true, function(on)
+	toggleButton(300, "INFECTION VFX: ON", "INFECTION VFX: OFF", true, function(on)
 		LocalPlayer:SetAttribute("GoreEnabled", on)
 	end)
-	toggleButton(286, "REDUCED MOTION: ON", "REDUCED MOTION: OFF", false, function(on)
+	toggleButton(338, "REDUCED MOTION: ON", "REDUCED MOTION: OFF", false, function(on)
 		-- Juice reads this to damp camera shake + FOV kick for motion-sensitive players.
 		LocalPlayer:SetAttribute("ReducedMotion", on)
 	end)
