@@ -227,9 +227,11 @@ function Juice.start(remotes: any)
 		if camera == nil then
 			return
 		end
+		-- Accessibility: damp shake + FOV kick for motion-sensitive players.
+		local motionScale = LocalPlayer:GetAttribute("ReducedMotion") == true and 0.15 or 1
 		if trauma > 0 then
 			local shake = trauma * trauma
-			local maxAngle = math.rad(5) * shake
+			local maxAngle = math.rad(5) * shake * motionScale
 			local rx = shakeSeed:NextNumber(-1, 1) * maxAngle
 			local ry = shakeSeed:NextNumber(-1, 1) * maxAngle
 			local rz = shakeSeed:NextNumber(-1, 1) * maxAngle * 0.5
@@ -237,7 +239,7 @@ function Juice.start(remotes: any)
 			trauma = math.max(0, trauma - dt * 1.6)
 		end
 		if fovKick > 0.01 then
-			camera.FieldOfView = BASE_FOV + fovKick
+			camera.FieldOfView = BASE_FOV + fovKick * motionScale
 			fovKick = math.max(0, fovKick - dt * 40)
 		elseif math.abs(camera.FieldOfView - BASE_FOV) > 0.01 then
 			camera.FieldOfView = BASE_FOV

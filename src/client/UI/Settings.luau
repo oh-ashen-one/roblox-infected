@@ -24,8 +24,8 @@ function Settings.start()
 	})
 
 	local panel = Theme.frame(gui, {
-		Size = UDim2.new(0, 300, 0, 330),
-		Position = UDim2.new(0.5, -150, 0.5, -165),
+		Size = UDim2.new(0, 300, 0, 372),
+		Position = UDim2.new(0.5, -150, 0.5, -186),
 		BackgroundTransparency = 0.05,
 		Visible = false,
 	})
@@ -146,6 +146,10 @@ function Settings.start()
 	end)
 	toggleButton(248, "INFECTION VFX: ON", "INFECTION VFX: OFF", true, function(on)
 		LocalPlayer:SetAttribute("GoreEnabled", on)
+	end)
+	toggleButton(286, "REDUCED MOTION: ON", "REDUCED MOTION: OFF", false, function(on)
+		-- Juice reads this to damp camera shake + FOV kick for motion-sensitive players.
+		LocalPlayer:SetAttribute("ReducedMotion", on)
 	end)
 
 	local close = Theme.button(panel, {
