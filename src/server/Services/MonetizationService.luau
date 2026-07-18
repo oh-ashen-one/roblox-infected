@@ -37,10 +37,10 @@ function MonetizationService:_grant(player: Player, productId: number): boolean
 	elseif productId == products.Coins12000 then
 		data.coins += 12000
 	elseif productId == products.CrateKey1 then
-		self._deps.economyService:openCrate(player, true)
+		self._deps.economyService:openCrate(player, "robux")
 	elseif productId == products.CrateKey5 then
 		for _ = 1, 5 do
-			self._deps.economyService:openCrate(player, true)
+			self._deps.economyService:openCrate(player, "robux")
 		end
 	elseif productId == products.PatientZeroToken then
 		data.pzTokens += 1

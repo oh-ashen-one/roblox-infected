@@ -173,7 +173,9 @@ function EconomyService:_crateAllowedFor(player: Player): boolean
 	return cache
 end
 
-function EconomyService:openCrate(player: Player, viaRobux: boolean): boolean
+-- method: "coins" (spend coins) | "keys" (spend an earned crate key) | "robux" (already
+-- paid via a dev product; no in-game deduction).
+function EconomyService:openCrate(player: Player, method: string): boolean
 	if not self:_crateAllowedFor(player) then
 		return false
 	end
@@ -181,7 +183,12 @@ function EconomyService:openCrate(player: Player, viaRobux: boolean): boolean
 	if data == nil then
 		return false
 	end
-	if not viaRobux then
+	if method == "keys" then
+		if (data.crateKeys or 0) < 1 then
+			return false
+		end
+		data.crateKeys -= 1
+	elseif method == "coins" then
 		if data.coins < GameConfig.Economy.CrateCostCoins then
 			return false
 		end
@@ -245,8 +252,8 @@ function EconomyService:start()
 			self:_prefetchGamePasses(player)
 		end)
 	end
-	remotes.onValidated("BuyCrate", function(player, _payload)
-		self:openCrate(player, false)
+	remotes.onValidated("BuyCrate", function(player, payload)
+		self:openCrate(player, payload.currency == "Keys" and "keys" or "coins")
 	end)
 	remotes.onValidated("EquipSkin", function(player, payload)
 		self:equipSkin(player, payload.skinId)

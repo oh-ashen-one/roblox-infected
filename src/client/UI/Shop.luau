@@ -106,6 +106,18 @@ function Shop.start(remotes: any)
 	buyCrate.MouseButton1Click:Connect(function()
 		remotes.fire("BuyCrate", { currency = "Coins" })
 	end)
+	-- Open with an earned key (from daily rewards / quests) instead of coins.
+	local keyCrate = Theme.button(panel, {
+		Size = UDim2.new(0, 170, 0, 36),
+		Position = UDim2.new(0, 16, 0, 178),
+		Text = "USE KEY (0)",
+		TextSize = 14,
+		BackgroundColor3 = Theme.Colors.Survivor,
+		TextColor3 = Theme.Colors.Bg,
+	})
+	keyCrate.MouseButton1Click:Connect(function()
+		remotes.fire("BuyCrate", { currency = "Keys" })
+	end)
 
 	-- Card-flip result row
 	local cards = {}
@@ -137,15 +149,15 @@ function Shop.start(remotes: any)
 	-- Owned skins list
 	Theme.label(panel, {
 		Size = UDim2.new(0, 300, 0, 20),
-		Position = UDim2.new(0, 16, 0, 210),
+		Position = UDim2.new(0, 16, 0, 222),
 		Text = "YOUR SKINS",
 		TextSize = 13,
 		TextColor3 = Theme.Colors.TextDim,
 		TextXAlignment = Enum.TextXAlignment.Left,
 	})
 	local list = Instance.new("ScrollingFrame")
-	list.Size = UDim2.new(1, -32, 0, 170)
-	list.Position = UDim2.new(0, 16, 0, 232)
+	list.Size = UDim2.new(1, -32, 0, 158)
+	list.Position = UDim2.new(0, 16, 0, 244)
 	list.BackgroundTransparency = 1
 	list.BorderSizePixel = 0
 	list.ScrollBarThickness = 6
@@ -202,6 +214,10 @@ function Shop.start(remotes: any)
 		profile = data
 		refreshSkins()
 		refreshLoadout()
+		local keys = data.crateKeys or 0
+		keyCrate.Text = ("USE KEY (%d)"):format(keys)
+		keyCrate.AutoButtonColor = keys > 0
+		keyCrate.BackgroundColor3 = keys > 0 and Theme.Colors.Survivor or Theme.Colors.PanelLight
 	end)
 
 	remotes.on("CrateResult", function(result)

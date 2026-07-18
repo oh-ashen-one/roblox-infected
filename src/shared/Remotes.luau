@@ -42,7 +42,7 @@ local Specs: { [string]: Spec } = {
 		validator = v.shape({ primary = v.oneOf({ "AssaultRifle", "Shotgun", "SMG" }) }),
 		ratePerSecond = 5,
 	},
-	BuyCrate = { validator = v.shape({ currency = v.oneOf({ "Coins" }) }), ratePerSecond = 2 },
+	BuyCrate = { validator = v.shape({ currency = v.oneOf({ "Coins", "Keys" }) }), ratePerSecond = 2 },
 	EquipSkin = { validator = v.shape({ skinId = v.str(64) }), ratePerSecond = 5 },
 	SprintState = { validator = v.shape({ sprinting = v.oneOf({ "on", "off" }) }), ratePerSecond = 10 },
 	Reload = {
