@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared.GameConfig)
 local SkinCatalog = require(Shared.SkinCatalog)
+local Titles = require(Shared.Titles)
 
 local Theme = require(script.Parent.Theme)
 
@@ -197,6 +198,27 @@ function Shop.start(remotes: any)
 				stripe.Parent = button
 				button.MouseButton1Click:Connect(function()
 					remotes.fire("EquipSkin", { skinId = skin.id })
+				end)
+			end
+		end
+		-- Owned nametag titles, equippable inline.
+		for _, title in Titles.All do
+			if profile.ownedTitles and profile.ownedTitles[title.id] then
+				local equipped = profile.equipped and profile.equipped.Title == title.id
+				local button = Theme.button(list, {
+					Size = UDim2.new(0, 136, 0, 44),
+					Text = (equipped and "✓ " or "") .. "Title: " .. title.text,
+					TextSize = 12,
+					BackgroundColor3 = equipped and Theme.Colors.Gold or Theme.Colors.PanelLight,
+					TextColor3 = equipped and Theme.Colors.Bg or Theme.Colors.Text,
+				})
+				local stripe = Instance.new("Frame")
+				stripe.Size = UDim2.new(0, 4, 1, 0)
+				stripe.BorderSizePixel = 0
+				stripe.BackgroundColor3 = rarityColor(title.rarity)
+				stripe.Parent = button
+				button.MouseButton1Click:Connect(function()
+					remotes.fire("EquipTitle", { titleId = title.id })
 				end)
 			end
 		end

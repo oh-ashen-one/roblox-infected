@@ -11,7 +11,8 @@ local PROFILE_TEMPLATE = {
 	coins = 0,
 	xp = 0,
 	ownedSkins = {} :: { [string]: boolean },
-	equipped = { Knife = "knife_steel", Gun = "gun_carbon" },
+	ownedTitles = { rookie = true } :: { [string]: boolean }, -- nametag titles unlocked by level
+	equipped = { Knife = "knife_steel", Gun = "gun_carbon", Title = "rookie" },
 	loadout = { primary = "AssaultRifle" },
 	stats = { kills = 0, conversions = 0, wins = 0, rounds = 0, firstBloods = 0, lastSurvivor = 0 },
 	receipts = {} :: { [string]: boolean }, -- processed dev-product receipts (idempotency)
@@ -64,6 +65,7 @@ function DataService:sync(player: Player)
 			coins = data.coins,
 			xp = data.xp,
 			ownedSkins = data.ownedSkins,
+			ownedTitles = data.ownedTitles,
 			equipped = data.equipped,
 			loadout = data.loadout,
 			stats = data.stats,

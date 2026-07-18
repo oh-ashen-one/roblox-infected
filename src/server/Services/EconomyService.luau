@@ -13,6 +13,7 @@ local Rewards = require(Shared.Rewards)
 local SkinCatalog = require(Shared.SkinCatalog)
 local CrateRoll = require(Shared.CrateRoll)
 local LevelMath = require(Shared.LevelMath)
+local Titles = require(Shared.Titles)
 
 local EconomyService = {}
 EconomyService.__index = EconomyService
@@ -115,6 +116,10 @@ function EconomyService:award(player: Player, event: string, won: boolean)
 	if levelUp.levelsGained > 0 then
 		data.coins += levelUp.coins
 		data.crateKeys += levelUp.keys
+		-- Unlock any nametag titles the new level grants.
+		for _, title in Titles.unlockedAt(levelUp.newLevel) do
+			data.ownedTitles[title.id] = true
+		end
 		self._deps.remotes.fireClient("LevelUp", player, {
 			level = levelUp.newLevel,
 			coins = levelUp.coins,
@@ -257,6 +262,27 @@ function EconomyService:equipSkin(player: Player, skinId: string)
 	end
 end
 
+-- Titles: stamp the equipped title text onto the character so all clients can render it
+-- over the player's head.
+function EconomyService:_applyTitleAttribute(player: Player)
+	local data = self._deps.dataService:get(player)
+	local character = player.Character
+	if data and character then
+		local title = Titles.get(data.equipped.Title or "")
+		character:SetAttribute("InfectedTitle", title and title.text or "")
+	end
+end
+
+function EconomyService:equipTitle(player: Player, titleId: string)
+	local data = self._deps.dataService:get(player)
+	if data == nil or data.ownedTitles[titleId] ~= true then
+		return
+	end
+	data.equipped.Title = titleId
+	self:_applyTitleAttribute(player)
+	self._deps.dataService:sync(player)
+end
+
 function EconomyService:setLoadout(player: Player, primary: string)
 	local data = self._deps.dataService:get(player)
 	if data then
@@ -286,6 +312,24 @@ function EconomyService:start()
 	remotes.onValidated("SelectLoadout", function(player, payload)
 		self:setLoadout(player, payload.primary)
 	end)
+	remotes.onValidated("EquipTitle", function(player, payload)
+		self:equipTitle(player, payload.titleId)
+	end)
+	-- Stamp the equipped title onto each character as it spawns.
+	local function hookCharacter(player: Player)
+		player.CharacterAdded:Connect(function()
+			task.defer(function()
+				self:_applyTitleAttribute(player)
+			end)
+		end)
+		if player.Character then
+			self:_applyTitleAttribute(player)
+		end
+	end
+	for _, player in Players:GetPlayers() do
+		hookCharacter(player)
+	end
+	Players.PlayerAdded:Connect(hookCharacter)
 end
 
 return EconomyService
