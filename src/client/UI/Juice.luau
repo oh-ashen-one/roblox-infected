@@ -40,6 +40,19 @@ local LocalPlayer = Players.LocalPlayer
 
 local Juice = {}
 
+-- Accessibility: colorblind mode shifts infection cues to a hue distinct from both the
+-- survivor blue and the danger red; the VFX toggle suppresses the bloody spray/bursts.
+local function infectionColor(): Color3
+	if LocalPlayer:GetAttribute("ColorblindMode") == true then
+		return Color3.fromRGB(255, 236, 0)
+	end
+	return Theme.Colors.Infected
+end
+
+local function goreOn(): boolean
+	return LocalPlayer:GetAttribute("GoreEnabled") ~= false
+end
+
 local BASE_FOV = 70
 
 -- Camera shake --------------------------------------------------------------------
@@ -252,30 +265,32 @@ function Juice.start(remotes: any)
 		haptic(payload.killed and 0.7 or 0.3, payload.killed and 0.16 or 0.05)
 		if payload.position then
 			damageNumber(payload.position, payload.damage or 0, payload.killed == true)
-			-- Impact spray: red on a kill, pale spark otherwise.
-			burst(
-				payload.position,
-				payload.killed and Theme.Colors.Danger or Color3.fromRGB(255, 235, 180),
-				payload.killed and 24 or 10,
-				payload.killed and 22 or 12,
-				payload.killed and 1.4 or 0.7
-			)
+			-- Impact spray (suppressed when VFX are off): red on a kill, pale spark otherwise.
+			if goreOn() then
+				burst(
+					payload.position,
+					payload.killed and Theme.Colors.Danger or Color3.fromRGB(255, 235, 180),
+					payload.killed and 24 or 10,
+					payload.killed and 22 or 12,
+					payload.killed and 1.4 or 0.7
+				)
+			end
 		end
 	end)
 
 	remotes.on("ConversionAlert", function(alert)
-		-- Everyone sees a green outbreak burst where a survivor turned.
-		if alert.position then
-			burst(alert.position, Theme.Colors.Infected, 40, 26, 2)
+		-- Everyone sees an outbreak burst where a survivor turned (unless VFX are off).
+		if alert.position and goreOn() then
+			burst(alert.position, infectionColor(), 40, 26, 2)
 		end
-		-- A conversion I personally landed: hitstop-style green flash + heavy kick, plus my
+		-- A conversion I personally landed: hitstop-style flash + heavy kick, plus my
 		-- equipped kill effect (a bigger burst in its colour) if I have one.
 		if alert.killerName and alert.killerName == LocalPlayer.DisplayName then
-			flashScreen(Theme.Colors.Infected, 0.5)
+			flashScreen(infectionColor(), 0.5)
 			addTrauma(0.4)
 			haptic(0.9, 0.2)
 			local fxColor = killEffectColor(myKillEffect)
-			if fxColor and alert.position then
+			if fxColor and alert.position and goreOn() then
 				burst(alert.position, fxColor, 70, 34, 2.6)
 			end
 		end
@@ -286,10 +301,13 @@ function Juice.start(remotes: any)
 		myRole = payload.role
 		if payload.role == "ZOMBIE" and was == "SURVIVOR" then
 			-- YOU got turned: full infection takeover.
-			flashScreen(Theme.Colors.Infected, 0.85)
+			local infColor = infectionColor()
+			flashScreen(infColor, 0.85)
 			addTrauma(0.9)
 			haptic(1, 0.4)
 			stinger.Text = "INFECTED"
+			stinger.TextColor3 = infColor
+			vignette.BackgroundColor3 = infColor
 			stinger.TextTransparency = 0
 			stinger.TextStrokeTransparency = 0.3
 			TweenService

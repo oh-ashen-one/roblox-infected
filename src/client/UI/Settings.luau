@@ -1,16 +1,20 @@
 --!strict
--- Settings panel: FOV, music/SFX volume, gore (conversion VFX) toggle.
--- Persists locally via player attributes for the session.
+-- Settings panel (accessibility + comfort): FOV, independent Music + SFX volume (via the
+-- SoundGroups from Sounds), a colorblind-mode toggle (infection cues shift to a colorblind-
+-- distinct hue, read by Juice), and an infection-VFX toggle. Persisted for the session via
+-- player attributes / SoundGroup volumes.
 
 local UserInputService = game:GetService("UserInputService")
-local SoundService = game:GetService("SoundService")
+local Players = game:GetService("Players")
 
 local Theme = require(script.Parent.Theme)
+local Sounds = require(script.Parent.Sounds)
 
 local Settings = {}
 
 function Settings.start()
 	local gui = Theme.screenGui("Settings", 4)
+	local LocalPlayer = Players.LocalPlayer
 
 	local toggle = Theme.button(gui, {
 		Size = UDim2.new(0, 90, 0, 36),
@@ -20,17 +24,20 @@ function Settings.start()
 	})
 
 	local panel = Theme.frame(gui, {
-		Size = UDim2.new(0, 300, 0, 230),
-		Position = UDim2.new(0.5, -150, 0.5, -115),
+		Size = UDim2.new(0, 300, 0, 330),
+		Position = UDim2.new(0.5, -150, 0.5, -165),
 		BackgroundTransparency = 0.05,
 		Visible = false,
 	})
 	Theme.corner(panel, 14)
+	Theme.gradient(panel, Theme.Colors.PanelLight, Theme.Colors.Panel, 90)
+	Theme.stroke(panel, Color3.fromRGB(60, 64, 78), 1, 0.3)
 	Theme.label(panel, {
 		Size = UDim2.new(1, 0, 0, 30),
 		Position = UDim2.new(0, 0, 0, 8),
 		Text = "SETTINGS",
-		TextSize = 18,
+		TextSize = 20,
+		Font = Theme.FontDisplay,
 	})
 
 	local function sliderRow(
@@ -39,7 +46,7 @@ function Settings.start()
 		initial: number,
 		onChange: (value: number) -> ()
 	)
-		local y = 44 + (order - 1) * 56
+		local y = 44 + (order - 1) * 52
 		Theme.label(panel, {
 			Size = UDim2.new(1, -32, 0, 18),
 			Position = UDim2.new(0, 16, 0, y),
@@ -95,32 +102,50 @@ function Settings.start()
 		end)
 	end
 
+	local musicGroup, sfxGroup = Sounds.getGroups()
+
 	sliderRow(1, "FIELD OF VIEW", 0.5, function(fraction)
 		local camera = workspace.CurrentCamera
 		if camera then
 			camera.FieldOfView = 60 + fraction * 40 -- 60..100
 		end
 	end)
-	sliderRow(2, "VOLUME", 0.5, function(fraction)
-		SoundService:SetAttribute("MasterVolume", fraction)
-		for _, sound in SoundService:GetDescendants() do
-			if sound:IsA("Sound") then
-				sound.Volume = fraction
-			end
-		end
+	sliderRow(2, "MUSIC VOLUME", musicGroup.Volume, function(fraction)
+		musicGroup.Volume = fraction
+	end)
+	sliderRow(3, "SFX VOLUME", sfxGroup.Volume, function(fraction)
+		sfxGroup.Volume = fraction
 	end)
 
-	local goreButton = Theme.button(panel, {
-		Size = UDim2.new(1, -32, 0, 34),
-		Position = UDim2.new(0, 16, 0, 158),
-		Text = "INFECTION VFX: ON",
-		TextSize = 13,
-	})
-	local goreOn = true
-	goreButton.MouseButton1Click:Connect(function()
-		goreOn = not goreOn
-		goreButton.Text = goreOn and "INFECTION VFX: ON" or "INFECTION VFX: OFF"
-		game:GetService("Players").LocalPlayer:SetAttribute("GoreEnabled", goreOn)
+	-- Toggle buttons
+	local function toggleButton(
+		y: number,
+		onText: string,
+		offText: string,
+		initial: boolean,
+		onChange: (on: boolean) -> ()
+	)
+		local on = initial
+		local button = Theme.button(panel, {
+			Size = UDim2.new(1, -32, 0, 32),
+			Position = UDim2.new(0, 16, 0, y),
+			Text = initial and onText or offText,
+			TextSize = 13,
+		})
+		button.MouseButton1Click:Connect(function()
+			on = not on
+			button.Text = on and onText or offText
+			onChange(on)
+		end)
+		return button
+	end
+
+	toggleButton(210, "COLORBLIND MODE: ON", "COLORBLIND MODE: OFF", false, function(on)
+		-- Juice reads this to shift infection cues to a colorblind-distinct hue.
+		LocalPlayer:SetAttribute("ColorblindMode", on)
+	end)
+	toggleButton(248, "INFECTION VFX: ON", "INFECTION VFX: OFF", true, function(on)
+		LocalPlayer:SetAttribute("GoreEnabled", on)
 	end)
 
 	local close = Theme.button(panel, {

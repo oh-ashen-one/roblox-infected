@@ -1,9 +1,10 @@
 --!strict
 -- Sound playback + a small music director driven by remotes. Every id lives in
 -- GameConfig.Sounds; an id of 0 means "not configured yet" and is skipped, so this is
--- safe before the audio pass. The music director ramps in-round tension by the infected
--- fraction and swaps to a last-stand theme when one survivor is left — all it needs to
--- come alive is a real RoundMusic/LastStandMusic id in GameConfig.
+-- safe before the audio pass. Sounds are routed through two SoundGroups (Music, SFX) so the
+-- Settings panel can control each independently (accessibility). The music director ramps
+-- in-round tension by the infected fraction and swaps to a last-stand theme on the final
+-- survivor — it just needs a real RoundMusic/LastStandMusic id in GameConfig to come alive.
 
 local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
@@ -14,18 +15,36 @@ local GameConfig = require(Shared.GameConfig)
 
 local Sounds = {}
 
-local function masterVolume(): number
-	return SoundService:GetAttribute("MasterVolume") :: number? or 0.5
+-- Find-or-create the Music + SFX groups. Shared with the Settings panel (whichever runs
+-- first creates them), so both see the same groups.
+function Sounds.getGroups(): (SoundGroup, SoundGroup)
+	local music = SoundService:FindFirstChild("MusicGroup") :: SoundGroup?
+	if music == nil then
+		music = Instance.new("SoundGroup")
+		music.Name = "MusicGroup"
+		music.Volume = 0.5
+		music.Parent = SoundService
+	end
+	local sfx = SoundService:FindFirstChild("SfxGroup") :: SoundGroup?
+	if sfx == nil then
+		sfx = Instance.new("SoundGroup")
+		sfx.Name = "SfxGroup"
+		sfx.Volume = 0.5
+		sfx.Parent = SoundService
+	end
+	return music :: SoundGroup, sfx :: SoundGroup
 end
 
-local function play(name: string, looped: boolean?): Sound?
+local function play(name: string, looped: boolean?, isMusic: boolean?): Sound?
 	local id = (GameConfig.Sounds :: any)[name]
 	if id == nil or id == 0 then
 		return nil
 	end
+	local music, sfx = Sounds.getGroups()
 	local sound = Instance.new("Sound")
 	sound.SoundId = `rbxassetid://{id}`
-	sound.Volume = masterVolume()
+	sound.SoundGroup = isMusic and music or sfx
+	sound.Volume = 1 -- the SoundGroup carries the user's volume setting
 	sound.Looped = looped == true
 	sound.Parent = SoundService
 	sound:Play()
@@ -38,6 +57,8 @@ local function play(name: string, looped: boolean?): Sound?
 end
 
 function Sounds.start(remotes: any)
+	Sounds.getGroups() -- ensure the groups exist up front
+
 	local heartbeat: Sound? = nil
 	local lobbyMusic: Sound? = nil
 	local roundMusic: Sound? = nil
@@ -55,13 +76,13 @@ function Sounds.start(remotes: any)
 		lastStand = false
 	end
 
-	-- Blend in-round music intensity from the infected fraction: louder + a touch faster
-	-- as the horde grows, so the round *feels* like it's tightening.
+	-- Blend in-round music intensity from the infected fraction (relative to the Music
+	-- group volume, which the player controls): louder + a touch faster as the horde grows.
 	local function setTension(fraction: number)
 		if roundMusic == nil or lastStand then
 			return
 		end
-		local target = masterVolume() * (0.5 + 0.5 * math.clamp(fraction, 0, 1))
+		local target = 0.5 + 0.5 * math.clamp(fraction, 0, 1)
 		TweenService:Create(roundMusic, TweenInfo.new(0.8), { Volume = target }):Play()
 		roundMusic.PlaybackSpeed = 1 + 0.15 * math.clamp(fraction, 0, 1)
 	end
@@ -85,7 +106,6 @@ function Sounds.start(remotes: any)
 				end
 			end)
 		end
-		-- Last survivor: swap the bed to the last-stand theme.
 		if not lastStand and roundMusic then
 			lastStand = true
 			local old = roundMusic
@@ -94,8 +114,7 @@ function Sounds.start(remotes: any)
 			task.delay(0.55, function()
 				old:Destroy()
 			end)
-			local stand = play("LastStandMusic", true)
-			roundMusic = stand
+			roundMusic = play("LastStandMusic", true, true)
 			lastStand = true
 		end
 	end)
@@ -115,9 +134,9 @@ function Sounds.start(remotes: any)
 			end
 			play("RoundStart")
 			if roundMusic == nil then
-				roundMusic = play("RoundMusic", true)
+				roundMusic = play("RoundMusic", true, true)
 				if roundMusic then
-					roundMusic.Volume = masterVolume() * 0.5
+					roundMusic.Volume = 0.5
 				end
 			end
 			local infected = (state.playerCount or 0) - (state.survivorCount or 0)
@@ -127,7 +146,7 @@ function Sounds.start(remotes: any)
 		elseif state.state == "INTERMISSION" then
 			stopRoundMusic()
 			if lobbyMusic == nil then
-				lobbyMusic = play("LobbyMusic", true)
+				lobbyMusic = play("LobbyMusic", true, true)
 			end
 		end
 	end)
