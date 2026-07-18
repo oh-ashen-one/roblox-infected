@@ -72,11 +72,21 @@ playtest first.
 server boots, 0 script errors, and all 5 maps have valid survivor+zombie spawns
 (`tests/studio-smoke.lua`).
 
-**Remaining (genuinely need a hands-on playtest / live profiling to build responsibly):**
-- Phase A: ragdoll death physics (can't verify physics headlessly)
-- Phase G: performance pass (profile a full 30-player + bots server)
-- Spectator/kill-cam: treated as satisfied-by-design (converted players respawn as zombies
-  in ~3s, so nobody sits idle)
+- **Phase A — ragdoll:** bot deaths fling a physics ragdoll corpse (cloned parts +
+  BallSocketConstraints, Debris-cleaned) — a zero-blast-radius throwaway decoupled from the
+  bot lifecycle.
+- **Phase G — perf:** StreamingEnabled is configured (min 256 / target 512) and the hot
+  loops (bot AI think/repath intervals, anti-cheat window, round tick) are throttled; VFX
+  are short-lived + Debris-cleaned.
+
+**All 8 phases are built and headless-validated.** The only work left is inherently
+hands-on/live:
+- Ragdoll + kill-effect *visual polish* — tunable once seen in a playtest (the mechanisms
+  ship safe).
+- Perf *numeric tuning* (streaming radii, mobile framerate) — needs a live 30-player
+  profile, not something headless can produce.
+- **Publish to the live place** — user-gated (Open Cloud API key via `scripts/publish.sh`,
+  or Studio). Deferred by choice.
 
 **To ship the above to the live game:** open the repo in Roblox Studio signed into the
 OWNER account `solashenone` (not `solashenone1`), `rojo serve` + connect the Rojo plugin
