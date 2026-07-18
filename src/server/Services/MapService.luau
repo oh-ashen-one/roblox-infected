@@ -11,8 +11,11 @@ local Lighting = game:GetService("Lighting")
 local Mall = require(script.Parent.Parent.Maps.Mall)
 local Suburbia = require(script.Parent.Parent.Maps.Suburbia)
 local Facility = require(script.Parent.Parent.Maps.Facility)
+local Warehouse = require(script.Parent.Parent.Maps.Warehouse)
+local Metro = require(script.Parent.Parent.Maps.Metro)
 
-local MAPS = { Mall, Suburbia, Facility }
+local MAPS = { Mall, Suburbia, Facility, Warehouse, Metro }
+local VOTE_CANDIDATES = 3 -- how many random maps are offered each vote (keeps the 3-button UI)
 
 local MapService = {}
 MapService.__index = MapService
@@ -32,7 +35,8 @@ function MapService.new(deps: Deps)
 	self._built = {} :: { Model }
 	self._active = nil :: Model?
 	self._activeIndex = 1
-	self._votes = {} :: { [Player]: number }
+	self._votes = {} :: { [Player]: number } -- player -> candidate slot (1..#candidates)
+	self._candidates = {} :: { number } -- actual map indices offered this vote
 	self._voteOpen = false
 
 	for _, mapDef in MAPS do
@@ -53,33 +57,61 @@ end
 
 -- Voting -------------------------------------------------------------------------
 
-function MapService:openVote()
-	table.clear(self._votes)
-	self._voteOpen = true
-	self._deps.remotes.fireAllClients("HordeUpdate", { mapVote = self:mapNames() })
+-- Pick N distinct random map indices to offer this vote.
+function MapService:_pickCandidates(): { number }
+	local pool = {}
+	for i = 1, #MAPS do
+		pool[i] = i
+	end
+	-- Fisher-Yates partial shuffle.
+	for i = #pool, 2, -1 do
+		local j = rng:NextInteger(1, i)
+		pool[i], pool[j] = pool[j], pool[i]
+	end
+	local out = {}
+	for i = 1, math.min(VOTE_CANDIDATES, #MAPS) do
+		out[i] = pool[i]
+	end
+	return out
 end
 
-function MapService:castVote(player: Player, mapIndex: number)
-	if self._voteOpen and mapIndex >= 1 and mapIndex <= #MAPS then
-		self._votes[player] = mapIndex
+function MapService:openVote()
+	table.clear(self._votes)
+	self._candidates = self:_pickCandidates()
+	self._voteOpen = true
+	local names = {}
+	for _, index in self._candidates do
+		table.insert(names, MAPS[index].name)
+	end
+	self._deps.remotes.fireAllClients("HordeUpdate", { mapVote = names })
+end
+
+-- `slot` is the candidate button index (1..#candidates), not the raw map index.
+function MapService:castVote(player: Player, slot: number)
+	if self._voteOpen and slot >= 1 and slot <= #self._candidates then
+		self._votes[player] = slot
 	end
 end
 
 function MapService:_tallyWinner(): number
-	local counts = table.create(#MAPS, 0)
-	for _, index in self._votes do
-		counts[index] += 1
+	local candidates = self._candidates
+	if #candidates == 0 then
+		return rng:NextInteger(1, #MAPS)
 	end
-	local best, bestCount = 0, -1
-	for i = 1, #MAPS do
+	local counts = table.create(#candidates, 0)
+	for _, slot in self._votes do
+		counts[slot] += 1
+	end
+	local bestSlot, bestCount = 0, -1
+	for i = 1, #candidates do
 		if counts[i] > bestCount then
-			best, bestCount = i, counts[i]
+			bestSlot, bestCount = i, counts[i]
 		end
 	end
 	if bestCount <= 0 then
-		return rng:NextInteger(1, #MAPS) -- nobody voted
+		return candidates[rng:NextInteger(1, #candidates)] -- nobody voted
 	end
-	return best
+	return candidates[bestSlot]
 end
 
 -- Round lifecycle ------------------------------------------------------------------

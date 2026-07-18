@@ -38,5 +38,27 @@ print("[HEADLESS] lobby map loaded:", sawMap and "OK" or "NEVER")
 task.wait(5)
 print("[HEADLESS] script errors during boot:", errorCount)
 
-local pass = sawRemotes and sawMap and errorCount == 0
+-- Validate every built map has survivor + zombie spawn markers (catches a malformed map).
+local ServerStorage = game:GetService("ServerStorage")
+local mapsOk = true
+local mapsFolder = ServerStorage:FindFirstChild("Maps")
+if mapsFolder then
+	for _, mapModel in mapsFolder:GetChildren() do
+		local sv = mapModel:FindFirstChild("SurvivorSpawns")
+		local zo = mapModel:FindFirstChild("ZombieSpawns")
+		local svCount = sv and #sv:GetChildren() or 0
+		local zoCount = zo and #zo:GetChildren() or 0
+		if svCount == 0 or zoCount == 0 then
+			mapsOk = false
+			print(("[HEADLESS] MAP %s BAD: survivorSpawns=%d zombieSpawns=%d"):format(mapModel.Name, svCount, zoCount))
+		else
+			print(("[HEADLESS] map %s: %d survivor / %d zombie spawns"):format(mapModel.Name, svCount, zoCount))
+		end
+	end
+else
+	mapsOk = false
+	print("[HEADLESS] Maps folder MISSING")
+end
+
+local pass = sawRemotes and sawMap and errorCount == 0 and mapsOk
 print("[HEADLESS] VERDICT:", pass and "PASS" or "FAIL")

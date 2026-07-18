@@ -29,11 +29,11 @@ function MapVote.start(remotes: any)
 	})
 
 	local buttons = {}
-	for i, name in MAP_NAMES do
+	for i = 1, 3 do
 		local button = Theme.button(panel, {
 			Size = UDim2.new(0, 172, 0, 48),
 			Position = UDim2.new(0, 8 + (i - 1) * 182, 0, 34),
-			Text = name,
+			Text = MAP_NAMES[i] or ("Map " .. i),
 			TextSize = 15,
 		})
 		button.MouseButton1Click:Connect(function()
@@ -44,6 +44,19 @@ function MapVote.start(remotes: any)
 		end)
 		buttons[i] = button
 	end
+
+	-- The server offers 3 random maps each vote; relabel the buttons to those candidates.
+	remotes.on("HordeUpdate", function(payload)
+		if payload.mapVote then
+			for i, button in buttons do
+				local name = payload.mapVote[i]
+				button.Visible = name ~= nil
+				if name then
+					button.Text = name
+				end
+			end
+		end
+	end)
 
 	remotes.on("RoundState", function(state)
 		panel.Visible = state.state == "INTERMISSION"
