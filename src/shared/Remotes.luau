@@ -49,6 +49,7 @@ local Specs: { [string]: Spec } = {
 		validator = v.shape({ weaponId = v.oneOf({ "AssaultRifle", "Shotgun", "SMG", "Pistol", "Minigun" }) }),
 		ratePerSecond = 4,
 	},
+	ClaimDaily = { validator = nil, ratePerSecond = 2 }, -- claim today's login reward
 
 	-- Server -> Client (no validator/rate limit; server is trusted)
 	RoundState = {},
@@ -63,6 +64,8 @@ local Specs: { [string]: Spec } = {
 	ShotFired = {},
 	KnifeThrown = {},
 	HitConfirm = {},
+	DailyStatus = {}, -- current login-streak status + payout for the client popup
+	DailyClaimed = {}, -- confirmation of a granted daily reward
 }
 
 local Remotes = {}

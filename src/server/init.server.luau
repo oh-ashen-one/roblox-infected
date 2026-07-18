@@ -19,6 +19,7 @@ local EconomyService = require(script.Services.EconomyService)
 local MonetizationService = require(script.Services.MonetizationService)
 local EndgameService = require(script.Services.EndgameService)
 local BotService = require(script.Services.BotService)
+local RetentionService = require(script.Services.RetentionService)
 
 -- Fast timers in Studio so a full round loop plays out in under a minute of testing.
 if game:GetService("RunService"):IsStudio() then
@@ -42,6 +43,7 @@ local roundService
 local roleService
 local endgameService
 local botService
+local retentionService
 
 -- Total survivor count = human survivors + bot survivors. Both RoleService (humans)
 -- and BotService (bots) call this whenever their counts change so the round machine
@@ -55,10 +57,18 @@ end
 local rng = Random.new()
 
 local mapService = MapService.new({ remotes = remotes })
-local dataService = DataService.new({ remotes = remotes })
+local dataService = DataService.new({
+	remotes = remotes,
+	onProfileLoaded = function(player)
+		if retentionService then
+			retentionService:onPlayerReady(player)
+		end
+	end,
+})
 local economyService = EconomyService.new({ remotes = remotes, dataService = dataService })
 local monetizationService =
 	MonetizationService.new({ dataService = dataService, economyService = economyService })
+retentionService = RetentionService.new({ remotes = remotes, dataService = dataService })
 
 roleService = RoleService.new({
 	remotes = remotes,
@@ -224,6 +234,7 @@ economyService:start()
 monetizationService:start()
 endgameService:start()
 botService:start()
+retentionService:start()
 
 -- Load a lobby map immediately so the very first pre-round moment isn't an empty
 -- baseplate.

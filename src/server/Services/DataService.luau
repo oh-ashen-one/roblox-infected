@@ -16,6 +16,8 @@ local PROFILE_TEMPLATE = {
 	stats = { kills = 0, conversions = 0, wins = 0, rounds = 0, firstBloods = 0, lastSurvivor = 0 },
 	receipts = {} :: { [string]: boolean }, -- processed dev-product receipts (idempotency)
 	pzTokens = 0,
+	crateKeys = 0, -- earned keys (daily rewards, quests) that open crates without coins
+	daily = { lastClaimDay = 0, streak = 0 }, -- login-streak reward state
 }
 
 export type Profile = typeof(PROFILE_TEMPLATE)
@@ -25,6 +27,7 @@ DataService.__index = DataService
 
 export type Deps = {
 	remotes: any, -- Remotes.ServerApi
+	onProfileLoaded: ((player: Player) -> ())?, -- fired once a player's profile is ready
 }
 
 function DataService.new(deps: Deps)
@@ -51,6 +54,7 @@ function DataService:sync(player: Player)
 			loadout = data.loadout,
 			stats = data.stats,
 			pzTokens = data.pzTokens,
+			crateKeys = data.crateKeys,
 		})
 	end
 end
@@ -74,6 +78,9 @@ function DataService:_load(player: Player)
 	if player.Parent == Players then
 		self._profiles[player] = profile
 		self:sync(player)
+		if self._deps.onProfileLoaded then
+			self._deps.onProfileLoaded(player)
+		end
 	else
 		profile:EndSession()
 	end
