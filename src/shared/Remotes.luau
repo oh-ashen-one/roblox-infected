@@ -49,6 +49,7 @@ local Specs: { [string]: Spec } = {
 		validator = v.shape({ weaponId = v.oneOf({ "AssaultRifle", "Shotgun", "SMG", "Pistol", "Minigun" }) }),
 		ratePerSecond = 4,
 	},
+	UseAbility = { validator = nil, ratePerSecond = 4 }, -- activate your zombie-class ability
 	ClaimDaily = { validator = nil, ratePerSecond = 2 }, -- claim today's login reward
 	MarkTutorialSeen = { validator = nil, ratePerSecond = 2 }, -- FTUE overlay dismissed
 	ClaimQuest = {
@@ -80,6 +81,7 @@ local Specs: { [string]: Spec } = {
 	LevelUp = {}, -- fired when a player crosses a level threshold (toast + reward)
 	Leaderboard = {}, -- top wins/conversions for the leaderboard panel
 	SeasonStatus = {}, -- season-pass tier track + progress for the client
+	AbilityState = {}, -- your zombie ability id + cooldown, for the client button/HUD
 }
 
 local Remotes = {}

@@ -111,7 +111,23 @@ local GameConfig = {
 			ability = "scream", -- pulses survivor positions
 			abilityCooldown = 30,
 		},
+		{
+			name = "Pouncer",
+			hordeThreshold = 0.4,
+			maxHealth = 90,
+			walkSpeedMult = 1.15,
+			attacksToKill = 2,
+			ability = "lunge", -- player-activated speed burst to run down fleeing survivors
+			abilityCooldown = 8,
+		},
 	} :: { ZombieClass },
+
+	-- Lunge tunables. LungeSpeed is an ABSOLUTE walkspeed for the burst; kept under
+	-- Movement.MaxToleratedSpeed so activating it never trips the anti-cheat.
+	Lunge = {
+		Speed = 40,
+		Duration = 0.6,
+	},
 
 	Rewards = {
 		-- Coins; XP mirrors coins 1:1

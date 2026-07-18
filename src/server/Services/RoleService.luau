@@ -40,6 +40,7 @@ function RoleService.new(deps: Deps)
 	-- Kept for the end-of-round reveal even if PZ dies/leaves mid-round
 	self._originalPZ = nil :: { userId: number, name: string }?
 	self._charConns = {} :: { [Player]: { RBXScriptConnection } }
+	self._abilityLastUse = {} :: { [Player]: number } -- os.clock of last ability activation
 	return self
 end
 
@@ -315,6 +316,12 @@ function RoleService:_applyZombieClass(player: Player, character: Model, class: 
 	end
 	character:SetAttribute("ZombieClass", class.name)
 	self._deps.remotes.fireClient("HordeUpdate", player, { yourClass = class.name })
+	-- Tell the client whether this class has a player-activated ability (for the button).
+	self._deps.remotes.fireClient("AbilityState", player, {
+		ability = class.ability == "lunge" and "lunge" or nil,
+		cooldown = class.abilityCooldown or 0,
+		ready = true,
+	})
 
 	if class.ability == "scream" and class.abilityCooldown then
 		-- Screamer: pulses survivor positions to the whole horde while alive
@@ -352,6 +359,61 @@ function RoleService:_applyZombieClass(player: Player, character: Model, class: 
 			end
 		end)
 	end
+end
+
+-- Player activated their zombie-class ability. Only "lunge" is player-triggered (scream is
+-- passive); it applies a brief, anti-cheat-safe speed burst to run down fleeing survivors.
+function RoleService:useAbility(player: Player)
+	if not self._roundActive or self._roles[player] ~= "ZOMBIE" then
+		return
+	end
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if character == nil or humanoid == nil or (humanoid :: Humanoid).Health <= 0 then
+		return
+	end
+	local className = character:GetAttribute("ZombieClass")
+	local class
+	for _, c in GameConfig.ZombieClasses do
+		if c.name == className then
+			class = c
+			break
+		end
+	end
+	if class == nil or class.ability ~= "lunge" then
+		return
+	end
+	local cooldown = class.abilityCooldown or 8
+	local now = os.clock()
+	local last = self._abilityLastUse[player] or -math.huge
+	if now - last < cooldown then
+		return -- still cooling down
+	end
+	self._abilityLastUse[player] = now
+
+	local baseSpeed = GameConfig.Movement.BaseWalkSpeed * class.walkSpeedMult
+	local h = humanoid :: Humanoid
+	h.WalkSpeed = GameConfig.Lunge.Speed
+	self._deps.remotes.fireClient("AbilityState", player, {
+		ability = "lunge",
+		cooldown = cooldown,
+		ready = false,
+	})
+	task.delay(GameConfig.Lunge.Duration, function()
+		-- Restore only if still this same zombie character.
+		if self._roles[player] == "ZOMBIE" and player.Character == character and h.Health > 0 then
+			h.WalkSpeed = baseSpeed
+		end
+	end)
+	task.delay(cooldown, function()
+		if self._roles[player] == "ZOMBIE" and player.Parent ~= nil then
+			self._deps.remotes.fireClient("AbilityState", player, {
+				ability = "lunge",
+				cooldown = cooldown,
+				ready = true,
+			})
+		end
+	end)
 end
 
 function RoleService:_spawnAsZombie(player: Player)
@@ -478,6 +540,10 @@ end
 function RoleService:start()
 	Players.CharacterAutoLoads = false
 
+	self._deps.remotes.onValidated("UseAbility", function(player)
+		self:useAbility(player)
+	end)
+
 	Players.PlayerAdded:Connect(function(player)
 		if self._roundActive then
 			-- Mid-round joiners join the horde: keeps them playing immediately
@@ -496,6 +562,7 @@ function RoleService:start()
 	Players.PlayerRemoving:Connect(function(player)
 		local role = self._roles[player]
 		self._roles[player] = nil
+		self._abilityLastUse[player] = nil
 		self:_unwatchCharacter(player)
 		if not self._roundActive then
 			return
