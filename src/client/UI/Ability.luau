@@ -6,7 +6,10 @@
 
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Keybinds = require(ReplicatedStorage:WaitForChild("Shared").Keybinds)
 local Theme = require(script.Parent.Theme)
 
 local Ability = {}
@@ -86,7 +89,10 @@ function Ability.start(remotes: any)
 		if gameProcessed then
 			return
 		end
-		if input.KeyCode == Enum.KeyCode.Q or input.KeyCode == Enum.KeyCode.ButtonY then
+		if
+			Keybinds.matches(Players.LocalPlayer, "ability", input.KeyCode)
+			or input.KeyCode == Enum.KeyCode.ButtonY
+		then
 			activate()
 		end
 	end)

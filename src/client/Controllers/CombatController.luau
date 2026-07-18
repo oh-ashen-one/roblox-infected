@@ -13,6 +13,7 @@ local Debris = game:GetService("Debris")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared.GameConfig)
+local Keybinds = require(Shared.Keybinds)
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -152,13 +153,21 @@ function CombatController.start(remotes: any)
 			else
 				actions.fire()
 			end
-		elseif input.KeyCode == Enum.KeyCode.F and state.role == "PATIENT_ZERO" then
+		elseif
+			Keybinds.matches(LocalPlayer, "throwKnife", input.KeyCode) and state.role == "PATIENT_ZERO"
+		then
 			actions.throwKnife()
-		elseif input.KeyCode == Enum.KeyCode.E and state.role == "PATIENT_ZERO" then
+		elseif Keybinds.matches(LocalPlayer, "melee", input.KeyCode) and state.role == "PATIENT_ZERO" then
 			actions.melee()
-		elseif input.KeyCode == Enum.KeyCode.R or input.KeyCode == Enum.KeyCode.ButtonX then
+		elseif
+			Keybinds.matches(LocalPlayer, "reload", input.KeyCode)
+			or input.KeyCode == Enum.KeyCode.ButtonX
+		then
 			actions.reload()
-		elseif input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then
+		elseif
+			Keybinds.matches(LocalPlayer, "sprint", input.KeyCode)
+			or input.KeyCode == Enum.KeyCode.ButtonL3
+		then
 			actions.setSprint(true)
 		elseif input.KeyCode == Enum.KeyCode.ButtonL1 then
 			if state.role == "PATIENT_ZERO" then
@@ -171,7 +180,7 @@ function CombatController.start(remotes: any)
 
 	UserInputService.InputEnded:Connect(function(input)
 		if
-			(input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3)
+			(Keybinds.matches(LocalPlayer, "sprint", input.KeyCode) or input.KeyCode == Enum.KeyCode.ButtonL3)
 			and state.sprinting
 		then
 			actions.setSprint(false)

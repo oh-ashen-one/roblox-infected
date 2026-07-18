@@ -7,6 +7,8 @@
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Keybinds = require(ReplicatedStorage:WaitForChild("Shared").Keybinds)
 local Theme = require(script.Parent.Theme)
 local Sounds = require(script.Parent.Sounds)
 
@@ -169,6 +171,82 @@ function Settings.start()
 	toggleButton(338, "REDUCED MOTION: ON", "REDUCED MOTION: OFF", false, function(on)
 		-- Juice reads this to damp camera shake + FOV kick for motion-sensitive players.
 		LocalPlayer:SetAttribute("ReducedMotion", on)
+	end)
+
+	-- Controls / rebind sub-panel ------------------------------------------------
+	local controlsPanel = Theme.frame(gui, {
+		Size = UDim2.new(0, 320, 0, 320),
+		Position = UDim2.new(0.5, -160, 0.5, -160),
+		BackgroundColor3 = Theme.Colors.Panel,
+		Visible = false,
+	})
+	Theme.corner(controlsPanel, 14)
+	Theme.gradient(controlsPanel, Theme.Colors.PanelLight, Theme.Colors.Panel, 90)
+	Theme.stroke(controlsPanel, Color3.fromRGB(60, 64, 78), 1, 0.3)
+	Theme.label(controlsPanel, {
+		Size = UDim2.new(1, 0, 0, 30),
+		Position = UDim2.new(0, 0, 0, 8),
+		Text = "CONTROLS",
+		TextSize = 20,
+		Font = Theme.FontDisplay,
+	})
+	local controlsClose = Theme.button(controlsPanel, {
+		Size = UDim2.new(0, 32, 0, 32),
+		Position = UDim2.new(1, -40, 0, 8),
+		Text = "X",
+	})
+	controlsClose.MouseButton1Click:Connect(function()
+		controlsPanel.Visible = false
+	end)
+
+	local listening: string? = nil
+	local keyButtons: { [string]: TextButton } = {}
+	for i, action in Keybinds.Order do
+		local y = 44 + (i - 1) * 42
+		Theme.label(controlsPanel, {
+			Size = UDim2.new(0, 160, 0, 32),
+			Position = UDim2.new(0, 16, 0, y),
+			Text = Keybinds.Labels[action],
+			TextSize = 15,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextColor3 = Theme.Colors.TextDim,
+		})
+		local keyButton = Theme.button(controlsPanel, {
+			Size = UDim2.new(0, 110, 0, 32),
+			Position = UDim2.new(1, -126, 0, y),
+			Text = Keybinds.get(LocalPlayer, action),
+			TextSize = 14,
+		})
+		keyButton.MouseButton1Click:Connect(function()
+			listening = action
+			keyButton.Text = "press a key..."
+		end)
+		keyButtons[action] = keyButton
+	end
+
+	-- Capture the next keyboard key while listening for a rebind.
+	UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		if listening == nil or gameProcessed then
+			return
+		end
+		if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode ~= Enum.KeyCode.Unknown then
+			local action = listening
+			listening = nil
+			Keybinds.set(LocalPlayer, action, input.KeyCode.Name)
+			keyButtons[action].Text = input.KeyCode.Name
+		end
+	end)
+
+	local controlsButton = Theme.button(panel, {
+		Size = UDim2.new(1, -32, 0, 32),
+		Position = UDim2.new(0, 16, 0, 376),
+		Text = "CONTROLS / REBIND",
+		TextSize = 13,
+		BackgroundColor3 = Theme.Colors.Survivor,
+		TextColor3 = Theme.Colors.Bg,
+	})
+	controlsButton.MouseButton1Click:Connect(function()
+		controlsPanel.Visible = not controlsPanel.Visible
 	end)
 
 	local close = Theme.button(panel, {

@@ -4,11 +4,13 @@
 
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared.GameConfig)
 local SkinCatalog = require(Shared.SkinCatalog)
 local Titles = require(Shared.Titles)
+local Keybinds = require(Shared.Keybinds)
 
 local Theme = require(script.Parent.Theme)
 
@@ -278,7 +280,7 @@ function Shop.start(remotes: any)
 		setOpen(false)
 	end)
 	UserInputService.InputBegan:Connect(function(input, gameProcessed)
-		if not gameProcessed and input.KeyCode == Enum.KeyCode.B then
+		if not gameProcessed and Keybinds.matches(Players.LocalPlayer, "shop", input.KeyCode) then
 			setOpen(not panel.Visible)
 		end
 	end)
