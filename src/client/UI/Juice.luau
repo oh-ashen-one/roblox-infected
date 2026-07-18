@@ -20,8 +20,21 @@ local HapticService = game:GetService("HapticService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared.GameConfig)
+local SkinCatalog = require(Shared.SkinCatalog)
 
 local Theme = require(script.Parent.Theme)
+
+local function killEffectColor(effectId: string?): Color3?
+	if effectId == nil then
+		return nil
+	end
+	for _, skin in SkinCatalog do
+		if skin.id == effectId and skin.slot == "KillEffect" then
+			return Color3.fromRGB(skin.color[1], skin.color[2], skin.color[3])
+		end
+	end
+	return nil
+end
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -219,6 +232,11 @@ function Juice.start(remotes: any)
 	end)
 
 	local myRole = "NONE"
+	local myKillEffect: string? = nil
+
+	remotes.on("ProfileSync", function(profile)
+		myKillEffect = profile.equipped and profile.equipped.KillEffect or nil
+	end)
 
 	remotes.on("ShotFired", function(payload)
 		if payload.shooterUserId == LocalPlayer.UserId then
@@ -250,11 +268,16 @@ function Juice.start(remotes: any)
 		if alert.position then
 			burst(alert.position, Theme.Colors.Infected, 40, 26, 2)
 		end
-		-- A conversion I personally landed: hitstop-style green flash + heavy kick.
+		-- A conversion I personally landed: hitstop-style green flash + heavy kick, plus my
+		-- equipped kill effect (a bigger burst in its colour) if I have one.
 		if alert.killerName and alert.killerName == LocalPlayer.DisplayName then
 			flashScreen(Theme.Colors.Infected, 0.5)
 			addTrauma(0.4)
 			haptic(0.9, 0.2)
+			local fxColor = killEffectColor(myKillEffect)
+			if fxColor and alert.position then
+				burst(alert.position, fxColor, 70, 34, 2.6)
+			end
 		end
 	end)
 

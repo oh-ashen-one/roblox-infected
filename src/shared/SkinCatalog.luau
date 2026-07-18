@@ -6,9 +6,9 @@ export type Skin = {
 	id: string,
 	name: string,
 	rarity: string, -- matches GameConfig.Economy.Rarities names
-	slot: "Knife" | "Gun",
-	color: { number }, -- {r,g,b} 0-255
-	material: string, -- Enum.Material name
+	slot: "Knife" | "Gun" | "KillEffect",
+	color: { number }, -- {r,g,b} 0-255 (weapon tint, or the burst colour for kill effects)
+	material: string, -- Enum.Material name (weapon skins); ignored for kill effects
 	animated: boolean?, -- Chroma-style hue cycle
 }
 
@@ -207,6 +207,49 @@ local SkinCatalog: { Skin } = {
 		rarity = "Chroma",
 		slot = "Gun",
 		color = { 0, 200, 255 },
+		material = "Neon",
+		animated = true,
+	},
+
+	-- Kill effects: the colored burst that plays when YOU convert someone. Cosmetic only.
+	{
+		id = "fx_ember",
+		name = "Ember Burst",
+		rarity = "Uncommon",
+		slot = "KillEffect",
+		color = { 255, 120, 40 },
+		material = "Neon",
+	},
+	{
+		id = "fx_frost",
+		name = "Frost Shatter",
+		rarity = "Rare",
+		slot = "KillEffect",
+		color = { 150, 220, 255 },
+		material = "Neon",
+	},
+	{
+		id = "fx_toxic",
+		name = "Toxic Bloom",
+		rarity = "Epic",
+		slot = "KillEffect",
+		color = { 150, 255, 60 },
+		material = "Neon",
+	},
+	{
+		id = "fx_void",
+		name = "Void Rupture",
+		rarity = "Legendary",
+		slot = "KillEffect",
+		color = { 170, 80, 240 },
+		material = "Neon",
+	},
+	{
+		id = "fx_rainbow",
+		name = "Prism Blast",
+		rarity = "Chroma",
+		slot = "KillEffect",
+		color = { 255, 0, 128 },
 		material = "Neon",
 		animated = true,
 	},
