@@ -27,6 +27,7 @@ function EconomyService.new(deps: Deps)
 	local self = setmetatable({}, EconomyService)
 	self._deps = deps
 	self._firstBloodClaimed = false
+	self._roundMultiplier = 1 -- round-modifier coin multiplier (Double Coins, etc.)
 	self._roundEarnings = {} :: { [Player]: number } -- for reveal-screen MVP stats
 	self._gamepassCache = {} :: { [Player]: { [number]: boolean } }
 	self._policyCache = {} :: { [Player]: boolean }
@@ -73,6 +74,12 @@ function EconomyService:resetRound()
 	table.clear(self._roundEarnings)
 end
 
+-- Set by the round-modifier system each round (1 = normal). Applied on top of the
+-- DoubleCoins gamepass, so a player with the pass on a Double Coins round earns 4x.
+function EconomyService:setRoundMultiplier(mult: number)
+	self._roundMultiplier = mult
+end
+
 function EconomyService:award(player: Player, event: string, won: boolean)
 	local data = self._deps.dataService:get(player)
 	if data == nil then
@@ -85,7 +92,7 @@ function EconomyService:award(player: Player, event: string, won: boolean)
 		minPlayers = GameConfig.Round.MinPlayersToStart,
 		fullRewardCount = GameConfig.Round.FullRewardPlayerCount,
 	})
-	local coins = amount
+	local coins = math.floor(amount * self._roundMultiplier)
 	local xp = amount
 	if self:_ownsGamePass(player, GameConfig.Products.GamePasses.DoubleCoins) then
 		coins *= 2

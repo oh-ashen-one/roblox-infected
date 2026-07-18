@@ -71,6 +71,7 @@ local Specs: { [string]: Spec } = {
 	DailyStatus = {}, -- current login-streak status + payout for the client popup
 	DailyClaimed = {}, -- confirmation of a granted daily reward
 	QuestStatus = {}, -- resolved daily/weekly quest list with progress for the client
+	RoundModifier = {}, -- active round modifier (banner + client lighting effects)
 }
 
 local Remotes = {}

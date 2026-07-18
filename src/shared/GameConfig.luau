@@ -27,6 +27,45 @@ local GameConfig = {
 		PatientZeroRecentRounds = 3, -- rounds a player is deprioritized after being PZ
 	},
 
+	-- Round modifiers add replay variety: one is rolled (weighted) at round start and
+	-- broadcast for a banner. Effects use clean global levers so no per-entity wiring is
+	-- needed — coinMult (reward multiplier), gravity (workspace.Gravity), blackout (client
+	-- lighting). "Normal" carries the bulk of the weight so most rounds are vanilla.
+	-- Server-driven: add a modifier here and it appears in rotation with no other change.
+	DefaultGravity = 196.2,
+	RoundModifiers = {
+		{ id = "normal", name = "Standard", desc = "A normal outbreak.", weight = 10 },
+		{
+			id = "double_coins",
+			name = "Double Coins",
+			desc = "All coin rewards are doubled this round.",
+			weight = 3,
+			coinMult = 2,
+		},
+		{
+			id = "blackout",
+			name = "Blackout",
+			desc = "The power is out. Survive in the dark.",
+			weight = 3,
+			blackout = true,
+		},
+		{
+			id = "low_gravity",
+			name = "Low Gravity",
+			desc = "Gravity is weak — bunny-hop for your life.",
+			weight = 2,
+			gravity = 70,
+		},
+		{
+			id = "moon_boots",
+			name = "Moon Boots",
+			desc = "Everyone jumps sky-high.",
+			weight = 2,
+			gravity = 110,
+			coinMult = 1.5,
+		},
+	},
+
 	Combat = {
 		SurvivorMaxHealth = 100,
 		PatientZero = {

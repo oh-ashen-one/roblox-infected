@@ -70,6 +70,42 @@ local monetizationService =
 	MonetizationService.new({ dataService = dataService, economyService = economyService })
 retentionService = RetentionService.new({ remotes = remotes, dataService = dataService })
 
+-- Round modifiers: roll one (weighted) at round start, apply via global levers, broadcast
+-- for the client banner + lighting, and clear at intermission.
+local function pickModifier()
+	local mods = GameConfig.RoundModifiers
+	local total = 0
+	for _, m in mods do
+		total += m.weight
+	end
+	local pick = rng:NextNumber(0, total)
+	for _, m in mods do
+		pick -= m.weight
+		if pick <= 0 then
+			return m
+		end
+	end
+	return mods[1]
+end
+
+local function applyModifier(mod)
+	workspace.Gravity = mod.gravity or GameConfig.DefaultGravity
+	economyService:setRoundMultiplier(mod.coinMult or 1)
+	remotes.fireAllClients("RoundModifier", {
+		active = true,
+		id = mod.id,
+		name = mod.name,
+		desc = mod.desc,
+		blackout = mod.blackout == true,
+	})
+end
+
+local function clearModifier()
+	workspace.Gravity = GameConfig.DefaultGravity
+	economyService:setRoundMultiplier(1)
+	remotes.fireAllClients("RoundModifier", { active = false })
+end
+
 roleService = RoleService.new({
 	remotes = remotes,
 	getSurvivorSpawn = function()
@@ -180,6 +216,7 @@ roundService = RoundService.new({
 		combatService:resetRound()
 		endgameService:resetRound()
 		mapService:loadVotedMap()
+		applyModifier(pickModifier())
 
 		-- Decide whether the Patient Zero is a human or a bot. With one human and
 		-- several bots, the human is usually a survivor being hunted (more fun solo),
@@ -233,6 +270,8 @@ roundService = RoundService.new({
 		botService:clear()
 	end,
 	onIntermission = function()
+		-- Reset any round modifier (gravity/lighting/multiplier) back to normal.
+		clearModifier()
 		-- Keep a map loaded as the lobby so players never stand on an empty baseplate.
 		mapService:loadLobby()
 		mapService:openVote()
