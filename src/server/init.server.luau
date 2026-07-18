@@ -22,6 +22,7 @@ local BotService = require(script.Services.BotService)
 local RetentionService = require(script.Services.RetentionService)
 local LeaderboardService = require(script.Services.LeaderboardService)
 local AnalyticsService = require(script.Services.AnalyticsService)
+local LiveConfigService = require(script.Services.LiveConfigService)
 
 -- Fast timers in Studio so a full round loop plays out in under a minute of testing.
 if game:GetService("RunService"):IsStudio() then
@@ -79,6 +80,7 @@ retentionService = RetentionService.new({
 })
 local leaderboardService = LeaderboardService.new({ remotes = remotes, dataService = dataService })
 local analyticsService = AnalyticsService.new()
+local liveConfigService = LiveConfigService.new()
 
 -- Round modifiers: roll one (weighted) at round start, apply via global levers, broadcast
 -- for the client banner + lighting, and clear at intermission.
@@ -311,6 +313,7 @@ endgameService:start()
 botService:start()
 retentionService:start()
 leaderboardService:start()
+liveConfigService:start()
 
 -- Load a lobby map immediately so the very first pre-round moment isn't an empty
 -- baseplate.
