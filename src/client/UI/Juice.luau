@@ -1,0 +1,248 @@
+--!strict
+-- Game feel ("juice"): the layer that makes a kill or a conversion look violent and
+-- satisfying in a clip. Everything here is purely cosmetic and client-local — the server
+-- already decided what happened; we just make it *land*.
+--   • camera trauma shake (Squirrel Eiserloh model) + FOV punch on fire
+--   • floating damage numbers at the hit point
+--   • muzzle flash + light on your own shots
+--   • hitstop white flash on a conversion you land
+--   • full-screen infection takeover when YOU get turned (green burst + vignette + stinger)
+--   • gamepad haptics scaled to event weight
+-- Driven entirely by the same remotes the HUD/Effects listen to, so it needs no new
+-- server protocol beyond the optional position/damage now carried on HitConfirm.
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Debris = game:GetService("Debris")
+local HapticService = game:GetService("HapticService")
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local GameConfig = require(Shared.GameConfig)
+
+local Theme = require(script.Parent.Theme)
+
+local LocalPlayer = Players.LocalPlayer
+
+local Juice = {}
+
+local BASE_FOV = 70
+
+-- Camera shake --------------------------------------------------------------------
+-- `trauma` in [0,1]; perceived shake is trauma^2 so small hits stay subtle and big
+-- events (getting infected) really kick. It decays every frame.
+local trauma = 0
+local fovKick = 0
+local shakeSeed = Random.new()
+
+local function addTrauma(amount: number)
+	trauma = math.clamp(trauma + amount, 0, 1)
+end
+
+local function punchFov(amount: number)
+	fovKick = math.min(fovKick + amount, 12)
+end
+
+-- Muzzle flash --------------------------------------------------------------------
+local function muzzleFlash(origin: Vector3, direction: Vector3)
+	local flash = Instance.new("Part")
+	flash.Anchored = true
+	flash.CanCollide = false
+	flash.CanQuery = false
+	flash.Material = Enum.Material.Neon
+	flash.Color = Color3.fromRGB(255, 230, 150)
+	flash.Size = Vector3.new(0.6, 0.6, 0.6)
+	flash.CFrame = CFrame.new(origin + direction * 1.2)
+	flash.Parent = workspace
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 220, 140)
+	light.Brightness = 6
+	light.Range = 14
+	light.Parent = flash
+	TweenService
+		:Create(flash, TweenInfo.new(0.08), { Size = Vector3.new(0.05, 0.05, 0.05), Transparency = 1 })
+		:Play()
+	Debris:AddItem(flash, 0.1)
+end
+
+-- Floating damage numbers ---------------------------------------------------------
+local function damageNumber(position: Vector3, amount: number, killed: boolean)
+	local anchor = Instance.new("Part")
+	anchor.Anchored = true
+	anchor.CanCollide = false
+	anchor.CanQuery = false
+	anchor.Transparency = 1
+	anchor.Size = Vector3.new(0.2, 0.2, 0.2)
+	local jitter =
+		Vector3.new(shakeSeed:NextNumber(-1, 1), shakeSeed:NextNumber(0, 1), shakeSeed:NextNumber(-1, 1))
+	anchor.CFrame = CFrame.new(position + jitter)
+	anchor.Parent = workspace
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Size = UDim2.new(0, 90, 0, 40)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = anchor
+
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.Font = Theme.Font
+	label.Text = killed and "KILL" or tostring(math.floor(amount + 0.5))
+	label.TextColor3 = killed and Theme.Colors.Danger or Theme.Colors.Text
+	label.TextStrokeTransparency = 0.2
+	label.TextScaled = true
+	label.Parent = billboard
+
+	TweenService:Create(anchor, TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		CFrame = anchor.CFrame + Vector3.new(0, 4, 0),
+	}):Play()
+	TweenService:Create(label, TweenInfo.new(0.7), { TextTransparency = 1, TextStrokeTransparency = 1 })
+		:Play()
+	Debris:AddItem(anchor, 0.75)
+end
+
+function Juice.start(remotes: any)
+	local gui = Theme.screenGui("Juice", 8)
+
+	-- Full-screen flash overlay (white hitstop + green infection).
+	local flash = Instance.new("Frame")
+	flash.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	flash.BackgroundTransparency = 1
+	flash.Size = UDim2.new(1, 0, 1, 0)
+	flash.BorderSizePixel = 0
+	flash.ZIndex = 20
+	flash.Parent = gui
+
+	-- Persistent infection mood while you're a zombie: a faint green wash whose edges
+	-- are stronger than the center, built from a gradient so it needs no image asset.
+	local vignette = Instance.new("Frame")
+	vignette.BackgroundColor3 = Theme.Colors.Infected
+	vignette.BackgroundTransparency = 1
+	vignette.BorderSizePixel = 0
+	vignette.Size = UDim2.new(1, 0, 1, 0)
+	vignette.ZIndex = 18
+	vignette.Parent = gui
+	local vignetteGradient = Instance.new("UIGradient")
+	vignetteGradient.Rotation = 90
+	-- Opaque(ish) at the top/bottom edges, clear through the middle band.
+	vignetteGradient.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(0.25, 1),
+		NumberSequenceKeypoint.new(0.75, 1),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	vignetteGradient.Parent = vignette
+
+	local stinger = Theme.label(gui, {
+		Size = UDim2.new(0, 500, 0, 90),
+		Position = UDim2.new(0.5, -250, 0.42, -45),
+		Text = "",
+		TextSize = 64,
+		TextTransparency = 1,
+		TextColor3 = Theme.Colors.Infected,
+		TextStrokeTransparency = 0.3,
+		ZIndex = 21,
+	})
+
+	local function flashScreen(color: Color3, strength: number)
+		flash.BackgroundColor3 = color
+		flash.BackgroundTransparency = 1 - strength
+		TweenService:Create(flash, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundTransparency = 1,
+		}):Play()
+	end
+
+	local function haptic(strength: number, duration: number)
+		if not HapticService:IsMotorSupported(Enum.UserInputType.Gamepad1, Enum.VibrationMotor.Large) then
+			return
+		end
+		HapticService:SetMotor(Enum.UserInputType.Gamepad1, Enum.VibrationMotor.Large, strength)
+		task.delay(duration, function()
+			HapticService:SetMotor(Enum.UserInputType.Gamepad1, Enum.VibrationMotor.Large, 0)
+		end)
+	end
+
+	-- Camera shake + FOV kick applied AFTER the default camera update each frame.
+	RunService:BindToRenderStep("JuiceCamera", Enum.RenderPriority.Camera.Value + 1, function(dt)
+		local camera = workspace.CurrentCamera
+		if camera == nil then
+			return
+		end
+		if trauma > 0 then
+			local shake = trauma * trauma
+			local maxAngle = math.rad(5) * shake
+			local rx = shakeSeed:NextNumber(-1, 1) * maxAngle
+			local ry = shakeSeed:NextNumber(-1, 1) * maxAngle
+			local rz = shakeSeed:NextNumber(-1, 1) * maxAngle * 0.5
+			camera.CFrame = camera.CFrame * CFrame.Angles(rx, ry, rz)
+			trauma = math.max(0, trauma - dt * 1.6)
+		end
+		if fovKick > 0.01 then
+			camera.FieldOfView = BASE_FOV + fovKick
+			fovKick = math.max(0, fovKick - dt * 40)
+		elseif math.abs(camera.FieldOfView - BASE_FOV) > 0.01 then
+			camera.FieldOfView = BASE_FOV
+		end
+	end)
+
+	local myRole = "NONE"
+
+	remotes.on("ShotFired", function(payload)
+		if payload.shooterUserId == LocalPlayer.UserId then
+			muzzleFlash(payload.origin, payload.direction)
+			addTrauma(0.12)
+			punchFov(2.5)
+			haptic(0.35, 0.06)
+		end
+	end)
+
+	remotes.on("HitConfirm", function(payload)
+		addTrauma(payload.killed and 0.3 or 0.1)
+		haptic(payload.killed and 0.7 or 0.3, payload.killed and 0.16 or 0.05)
+		if payload.position then
+			damageNumber(payload.position, payload.damage or 0, payload.killed == true)
+		end
+	end)
+
+	remotes.on("ConversionAlert", function(alert)
+		-- A conversion I personally landed: hitstop-style green flash + heavy kick.
+		if alert.killerName and alert.killerName == LocalPlayer.DisplayName then
+			flashScreen(Theme.Colors.Infected, 0.5)
+			addTrauma(0.4)
+			haptic(0.9, 0.2)
+		end
+	end)
+
+	remotes.on("RoleAssigned", function(payload)
+		local was = myRole
+		myRole = payload.role
+		if payload.role == "ZOMBIE" and was == "SURVIVOR" then
+			-- YOU got turned: full infection takeover.
+			flashScreen(Theme.Colors.Infected, 0.85)
+			addTrauma(0.9)
+			haptic(1, 0.4)
+			stinger.Text = "INFECTED"
+			stinger.TextTransparency = 0
+			stinger.TextStrokeTransparency = 0.3
+			TweenService
+				:Create(stinger, TweenInfo.new(1.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+					TextTransparency = 1,
+					TextStrokeTransparency = 1,
+				})
+				:Play()
+			TweenService:Create(vignette, TweenInfo.new(0.6), { BackgroundTransparency = 0.5 }):Play()
+		elseif payload.role ~= "ZOMBIE" then
+			-- New round / non-zombie: clear the infection vignette.
+			TweenService:Create(vignette, TweenInfo.new(0.4), { BackgroundTransparency = 1 }):Play()
+		end
+	end)
+
+	remotes.on("SurvivorPing", function()
+		addTrauma(0.15)
+	end)
+
+	return {}
+end
+
+return Juice

@@ -5,6 +5,7 @@
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -24,6 +25,29 @@ local function renderKnifeFlight(origin: Vector3, direction: Vector3)
 	knife.CanQuery = false
 	knife.Anchored = true
 	knife.Parent = workspace
+
+	-- Streaking trail so the throw reads as a fast, dangerous projectile in a clip.
+	local a0 = Instance.new("Attachment")
+	a0.Position = Vector3.new(0, 0, 0.6)
+	a0.Parent = knife
+	local a1 = Instance.new("Attachment")
+	a1.Position = Vector3.new(0, 0, -0.6)
+	a1.Parent = knife
+	local trail = Instance.new("Trail")
+	trail.Attachment0 = a0
+	trail.Attachment1 = a1
+	trail.Lifetime = 0.25
+	trail.LightEmission = 0.5
+	trail.WidthScale = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	trail.Color = ColorSequence.new(Color3.fromRGB(180, 255, 150))
+	trail.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.2),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	trail.Parent = knife
 
 	local position = origin
 	local velocity = direction * pz.ThrowSpeed
@@ -106,8 +130,21 @@ function Effects.start(remotes: any)
 
 	remotes.on("HitConfirm", function(payload)
 		hitmarker.TextColor3 = payload.killed and Theme.Colors.Danger or Theme.Colors.Text
+		hitmarker.Text = payload.killed and "☠" or "✕"
+		hitmarker.TextSize = payload.killed and 40 or 26
+		-- Pop: snap large + opaque, then shrink and fade out so hits feel crunchy.
 		hitmarker.Visible = true
-		task.delay(0.12, function()
+		hitmarker.TextTransparency = 0
+		hitmarker.Size = UDim2.new(0, 60, 0, 60)
+		hitmarker.Position = UDim2.new(0.5, -30, 0.5, -30)
+		TweenService
+			:Create(hitmarker, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				Size = UDim2.new(0, 40, 0, 40),
+				Position = UDim2.new(0.5, -20, 0.5, -20),
+				TextTransparency = 1,
+			})
+			:Play()
+		task.delay(0.2, function()
 			hitmarker.Visible = false
 		end)
 	end)

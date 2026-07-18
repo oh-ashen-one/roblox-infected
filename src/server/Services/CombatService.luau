@@ -243,7 +243,11 @@ function CombatService:_hitscan(
 		local model = result.Instance:FindFirstAncestorOfClass("Model")
 		if self._deps.botService and model and self._deps.botService:isZombieBot(model) then
 			local killed = self._deps.botService:damageBot(model, spec.Damage, shooter)
-			self._deps.remotes.fireClient("HitConfirm", shooter, { killed = killed })
+			self._deps.remotes.fireClient(
+				"HitConfirm",
+				shooter,
+				{ killed = killed, position = result.Position, damage = spec.Damage }
+			)
 		end
 		return
 	end
@@ -260,21 +264,21 @@ function CombatService:_hitscan(
 		if (victimHumanoid :: Humanoid).Health <= 0 then
 			self._deps.onZombieKilled(shooter, victim)
 		end
-		self._deps.remotes.fireClient(
-			"HitConfirm",
-			shooter,
-			{ killed = (victimHumanoid :: Humanoid).Health <= 0 }
-		)
+		self._deps.remotes.fireClient("HitConfirm", shooter, {
+			killed = (victimHumanoid :: Humanoid).Health <= 0,
+			position = result.Position,
+			damage = spec.Damage,
+		})
 	elseif victimRole == "PATIENT_ZERO" then
 		-- The mind game: shooting the hidden PZ works
 		tagKiller(victim, shooter)
 		local vh = victimHumanoid :: Humanoid
 		vh:TakeDamage(spec.Damage)
-		self._deps.remotes.fireClient(
-			"HitConfirm",
-			shooter,
-			{ killed = (victimHumanoid :: Humanoid).Health <= 0 }
-		)
+		self._deps.remotes.fireClient("HitConfirm", shooter, {
+			killed = (victimHumanoid :: Humanoid).Health <= 0,
+			position = result.Position,
+			damage = spec.Damage,
+		})
 	else
 		-- Survivor shot survivor: no damage, no feedback (prevents role-scanning by shooting)
 		return
