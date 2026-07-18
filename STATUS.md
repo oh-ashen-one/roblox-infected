@@ -79,14 +79,24 @@ server boots, 0 script errors, and all 5 maps have valid survivor+zombie spawns
   loops (bot AI think/repath intervals, anti-cheat window, round tick) are throttled; VFX
   are short-lived + Debris-cleaned.
 
-**All 8 phases are built and headless-validated.** The only work left is inherently
-hands-on/live:
-- Ragdoll + kill-effect *visual polish* — tunable once seen in a playtest (the mechanisms
-  ship safe).
-- Perf *numeric tuning* (streaming radii, mobile framerate) — needs a live 30-player
-  profile, not something headless can produce.
+Additional gap-closures after the first pass:
+- **Phase D:** third special-infected ability — **Stalker cloak** (brief semi-invisibility).
+  Now scream (passive) + lunge + cloak.
+- **Phase G:** LiveConfig now tunes **round-modifier weights** (`Modifier.<id>.weight`), so
+  events can be enabled/disabled/reweighted live — closes "add/change an event by config
+  only."
+- **Phase H accessibility:** independent Music/SFX sliders, **colorblind mode**,
+  **reduced-motion**, **UI-size (text-scale)** slider, working VFX toggle.
+
+**All 8 phases are built, headless-validated (76 unit tests + boot check), and pushed.**
+The only work left is inherently hands-on/live or asset-dependent:
 - **Publish to the live place** — user-gated (Open Cloud API key via `scripts/publish.sh`,
   or Studio). Deferred by choice.
+- Perf *numeric tuning* (streaming radii, mobile framerate) — needs a live 30-player profile.
+- Ragdoll + kill-effect *visual polish* — tunable once seen in a playtest (mechanisms ship
+  safe).
+- Deferred extras: control-remap (large), emotes (need uploaded animation assets), full
+  party matchmaking (reserved servers).
 
 **To ship the above to the live game:** open the repo in Roblox Studio signed into the
 OWNER account `solashenone` (not `solashenone1`), `rojo serve` + connect the Rojo plugin
