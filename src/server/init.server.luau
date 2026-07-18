@@ -110,6 +110,9 @@ botService = BotService.new({
 	getHumanSurvivors = function()
 		return roleService:survivors()
 	end,
+	getInfectedPlayerRoots = function()
+		return roleService:zombiePlayerRoots()
+	end,
 	convertHuman = function(victim: Player)
 		roleService:convert(victim, nil)
 	end,

@@ -90,6 +90,38 @@ local GameConfig = {
 		TargetPlayers = 8, -- fill humans + bots up to this headcount
 		MaxBots = 11, -- never spawn more than this
 		ThinkInterval = 0.35, -- AI tick period (seconds)
+
+		-- Navigation (PathfindingService). Paths are recomputed when the target moves
+		-- past RepathDistance or on a timer, not every tick — computing a path is costly.
+		AgentRadius = 2,
+		AgentHeight = 5,
+		RepathInterval = 0.8, -- min seconds between path recomputes for a chasing bot
+		RepathDistance = 8, -- recompute if the goal moved this many studs
+		WaypointReached = 4, -- distance at which a waypoint counts as reached
+		StuckSpeed = 2, -- studs/sec below which a bot is "stuck"
+		StuckRepathAfter = 1.2, -- seconds stuck before forcing a repath/jump
+
+		-- Survivor behaviour
+		FleeRadius = 26, -- start fleeing when a visible infected is this close
+		SightRange = 80, -- how far bots can "see" (line-of-sight raycast)
+		GroupRadius = 40, -- survivors drift toward other survivors within this range
+
+		-- Survivor bots shooting back at VISIBLE zombies (never the hidden PZ — that would
+		-- leak the mind-game). Human-like: only when they have line of sight, with a delay.
+		ShootRange = 60,
+		ShootInterval = 0.9, -- min seconds between a survivor bot's shots
+		ShootReactionMin = 0.25, -- random aim delay before the first shot
+		ShootReactionMax = 0.7,
+		ShootAccuracy = 0.7, -- fraction of shots that actually land (rest miss cosmetically)
+
+		-- Difficulty tiers rolled per-bot at spawn; scales chase speed + reaction.
+		Difficulties = {
+			{ name = "Rookie", weight = 3, speedMult = 0.92, reactionMult = 1.5 },
+			{ name = "Regular", weight = 4, speedMult = 1.0, reactionMult = 1.0 },
+			{ name = "Veteran", weight = 2, speedMult = 1.06, reactionMult = 0.7 },
+		},
+		-- Personalities bias survivor behaviour (roam vs group vs hide).
+		Personalities = { "roamer", "grouper", "cautious", "aggressive" },
 	},
 
 	Movement = {

@@ -144,6 +144,22 @@ function RoleService:survivors(): { Player }
 	return out
 end
 
+-- Roots of players who are VISIBLY infected (role ZOMBIE). Deliberately excludes the
+-- hidden Patient Zero, so bots reacting to these roots never leak the mind-game.
+function RoleService:zombiePlayerRoots(): { BasePart }
+	local out: { BasePart } = {}
+	for player, role in self._roles do
+		if role == "ZOMBIE" then
+			local char = player.Character
+			local r = char and char:FindFirstChild("HumanoidRootPart")
+			if r and r:IsA("BasePart") then
+				table.insert(out, r)
+			end
+		end
+	end
+	return out
+end
+
 -- Round lifecycle ---------------------------------------------------------------
 
 -- opts.allSurvivors: no human is Patient Zero this round (a bot will be instead).
