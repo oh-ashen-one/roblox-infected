@@ -16,6 +16,7 @@
 
 local RunService = game:GetService("RunService")
 local PathfindingService = game:GetService("PathfindingService")
+local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -380,10 +381,85 @@ function BotService:isZombieBot(character: Model): boolean
 	return bot ~= nil and bot.role == "ZOMBIE"
 end
 
+-- A short-lived physics ragdoll "corpse" flung on death. It is a SEPARATE throwaway model
+-- (cloned mesh parts joined by BallSocketConstraints, Debris-cleaned after a few seconds),
+-- completely decoupled from the bot's own rig + lifecycle — so it can never affect game
+-- state or the respawn. Being server-made, it replicates to every client.
+local function socketJoint(partA: BasePart, posA: Vector3, partB: BasePart, posB: Vector3)
+	local a0 = Instance.new("Attachment")
+	a0.Position = posA
+	a0.Parent = partA
+	local a1 = Instance.new("Attachment")
+	a1.Position = posB
+	a1.Parent = partB
+	local bs = Instance.new("BallSocketConstraint")
+	bs.Attachment0 = a0
+	bs.Attachment1 = a1
+	bs.LimitsEnabled = true
+	bs.UpperAngle = 60
+	bs.Parent = partA
+end
+
+function BotService:_spawnCorpse(bot: Bot)
+	local src = bot.model
+	local corpse = Instance.new("Model")
+	corpse.Name = "Corpse"
+	local parts: { [string]: BasePart } = {}
+	for _, name in { "Torso", "Head", "LeftLeg", "RightLeg" } do
+		local orig = src:FindFirstChild(name)
+		if orig and orig:IsA("BasePart") then
+			local clone = orig:Clone()
+			-- Strip welds / name-tag / attachments so the clone is a free physics body.
+			for _, child in clone:GetChildren() do
+				child:Destroy()
+			end
+			clone.Anchored = false
+			clone.CanCollide = true
+			clone.Parent = corpse
+			parts[name] = clone
+		end
+	end
+	if parts.Torso == nil then
+		return
+	end
+	corpse.PrimaryPart = parts.Torso
+	corpse.Parent = workspace
+	if parts.Head then
+		socketJoint(parts.Torso, Vector3.new(0, 1, 0), parts.Head, Vector3.new(0, -0.6, 0))
+	end
+	if parts.LeftLeg then
+		socketJoint(parts.Torso, Vector3.new(-0.5, -1, 0), parts.LeftLeg, Vector3.new(0, 1, 0))
+	end
+	if parts.RightLeg then
+		socketJoint(parts.Torso, Vector3.new(0.5, -1, 0), parts.RightLeg, Vector3.new(0, 1, 0))
+	end
+	-- Flop it: a little pop + spin.
+	parts.Torso.AssemblyLinearVelocity = Vector3.new(rng:NextNumber(-12, 12), 18, rng:NextNumber(-12, 12))
+	parts.Torso.AssemblyAngularVelocity = Vector3.new(rng:NextNumber(-8, 8), rng:NextNumber(-8, 8), 0)
+	-- Green death puff.
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Color = ColorSequence.new(Color3.fromRGB(90, 200, 60))
+	emitter.Lifetime = NumberRange.new(0.3, 0.6)
+	emitter.Speed = NumberRange.new(6, 12)
+	emitter.SpreadAngle = Vector2.new(180, 180)
+	emitter.Rate = 0
+	emitter.Enabled = false
+	emitter.Parent = parts.Torso
+	emitter:Emit(24)
+	Debris:AddItem(corpse, 5)
+end
+
 function BotService:_onBotDied(bot: Bot)
 	-- Zombie bots respawn near the action; keeps the horde pressure up.
 	if not self._active or bot.role ~= "ZOMBIE" then
 		return
+	end
+	-- Fling a ragdoll corpse and hide the real rig until it respawns.
+	self:_spawnCorpse(bot)
+	for _, part in bot.model:GetDescendants() do
+		if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+			part.Transparency = 1
+		end
 	end
 	task.delay(GameConfig.Round.ZombieRespawnSeconds, function()
 		if not self._active or self._bots[bot.id] == nil then
@@ -400,6 +476,12 @@ function BotService:_onBotDied(bot: Bot)
 		local spawnCFrame = self._deps.getZombieSpawn(roots) or CFrame.new(0, 5, 0)
 		bot.root.CFrame = spawnCFrame + Vector3.new(0, 3, 0)
 		bot.humanoid.Health = bot.humanoid.MaxHealth
+		-- Restore the rig now that the corpse has flopped away.
+		for _, part in bot.model:GetDescendants() do
+			if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+				part.Transparency = 0
+			end
+		end
 	end)
 end
 
