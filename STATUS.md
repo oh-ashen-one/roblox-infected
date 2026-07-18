@@ -30,12 +30,24 @@ live Roblox place — that needs a Studio publish from the owner account (see be
   survivor. Hidden PZ never leaks to bot senses.
 - **Phase C — retention:** daily login-streak rewards, daily/weekly quests
   (deterministic rotation, progress tracked from combat/round events), earned crate keys
-  with a Shop "USE KEY" sink. New RetentionService + shared DailyReward/Quests modules.
+  with a Shop "USE KEY" sink, XP level-up rewards + HUD level bar/toast. New
+  RetentionService + shared DailyReward/Quests/LevelMath modules.
+- **Phase D — round variety:** server-driven round modifiers (Double Coins, Blackout,
+  Low Gravity, Moon Boots) rolled per round with a client banner + reversible lighting.
+- **Phase E — reveal:** clip-ready end-of-round sequence with server-computed MVP and a
+  staggered Patient Zero unmask.
+- **Phase F — onboarding:** first-time tutorial overlay (persisted `seenTutorial`), control
+  hints adapt to touch vs keyboard.
+
+**Runtime validation status:** all of the above passes static CI (stylua/selene/54 Lune
+unit tests/rojo build) but NONE has been playtested in Studio yet. A Studio playtest is
+the highest-value next step before building more — it de-risks the bot pathfinding, the
+combat feel, and the new UI in one pass.
 
 **Remaining Phase A polish:** ragdoll death physics (deferred — can't verify headlessly).
-**Still to build:** Phase C season pass + cosmetic depth; Phases D–H (more maps + special
-infected + round modifiers; parties/leaderboards/share-screen; FTUE; LiveConfigService +
-analytics + anti-cheat/perf; UI overhaul).
+**Still to build:** Phase C season pass + deeper cosmetics (kill effects, emotes, titles);
+Phase D more maps + special-infected abilities; Phase E parties + global leaderboards;
+Phase G LiveConfigService + analytics + anti-cheat/perf; Phase H full UI overhaul.
 
 **To ship the above to the live game:** open the repo in Roblox Studio signed into the
 OWNER account `solashenone` (not `solashenone1`), `rojo serve` + connect the Rojo plugin
