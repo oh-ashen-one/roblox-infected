@@ -39,15 +39,27 @@ live Roblox place — that needs a Studio publish from the owner account (see be
 - **Phase F — onboarding:** first-time tutorial overlay (persisted `seenTutorial`), control
   hints adapt to touch vs keyboard.
 
-**Runtime validation status:** all of the above passes static CI (stylua/selene/54 Lune
-unit tests/rojo build) but NONE has been playtested in Studio yet. A Studio playtest is
-the highest-value next step before building more — it de-risks the bot pathfinding, the
-combat feel, and the new UI in one pass.
+- **Phase C — retention (COMPLETE):** + XP level-up rewards + season pass (28-day, 30-tier
+  free/premium track). Full retention loop.
+- **Phase E — social:** + global leaderboards (wins/conversions on OrderedDataStore,
+  pcall-guarded).
+- **Phase G — live-ops:** + anti-cheat expansion (tested classifier, fixed a moderate
+  speed-hack detection hole) + LiveConfigService (tune timings/headcounts/prices via a
+  DataStore, no republish).
+- **Phase H — UI overhaul:** theme glow-up + polished panels across HUD/shop/quests/
+  leaderboard/season/reveal/map-vote/role-card.
 
-**Remaining Phase A polish:** ragdoll death physics (deferred — can't verify headlessly).
-**Still to build:** Phase C season pass + deeper cosmetics (kill effects, emotes, titles);
-Phase D more maps + special-infected abilities; Phase E parties + global leaderboards;
-Phase G LiveConfigService + analytics + anti-cheat/perf; Phase H full UI overhaul.
+**Runtime validation status:** all of the above passes static CI (stylua/selene/**72** Lune
+unit tests/rojo build) but NONE has been playtested in Studio yet. A Studio playtest is now
+the highest-value next step — it de-risks the bot pathfinding, combat feel, and the new UI
+in one pass, and is required before publishing.
+
+**Remaining (needs a playtest to build responsibly, then publish):**
+- Phase D: special-infected abilities (lunge/screamer/etc.) + 2–3 more maps
+- Phase E: parties/friend-invite + spectator/kill-cam
+- Phase G: performance pass (profile a full 30-player + bots server)
+- Phase A: ragdoll death physics
+- Deeper cosmetics: kill effects / emotes / titles (new equip slots)
 
 **To ship the above to the live game:** open the repo in Roblox Studio signed into the
 OWNER account `solashenone` (not `solashenone1`), `rojo serve` + connect the Rojo plugin
