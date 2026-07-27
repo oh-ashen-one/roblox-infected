@@ -14,6 +14,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared.GameConfig)
+local Ballistics = require(Shared.Ballistics)
 
 local CombatService = {}
 CombatService.__index = CombatService
@@ -32,7 +33,7 @@ export type Deps = {
 -- (covers latency); beyond it the shot is rejected and flagged.
 local ORIGIN_TOLERANCE = 12
 
-type WeaponState = { mag: number, lastShot: number, reloadingUntil: number }
+type WeaponState = { mag: number, lastShot: number, reloadingUntil: number, shotsInBurst: number }
 
 function CombatService.new(deps: Deps)
 	local self = setmetatable({}, CombatService)
@@ -136,7 +137,7 @@ function CombatService:_weaponStateFor(player: Player, weaponId: string): Weapon
 	local state = perPlayer[weaponId]
 	if state == nil then
 		local spec = (GameConfig.Combat.Guns :: any)[weaponId]
-		state = { mag = spec.Mag, lastShot = 0, reloadingUntil = 0 }
+		state = { mag = spec.Mag, lastShot = 0, reloadingUntil = 0, shotsInBurst = 0 }
 		perPlayer[weaponId] = state
 	end
 	return state
@@ -196,20 +197,26 @@ function CombatService:handleFireWeapon(
 	if state.mag <= 0 then
 		return
 	end
+	local lastShotAt = state.lastShot
 	state.lastShot = now
 	state.mag -= 1
 
+	-- Bloom: decay what the previous burst accumulated, then charge this shot. The server
+	-- owns the cone, so a client that fakes a perfectly-centred direction still gets spread.
+	state.shotsInBurst = Ballistics.decayShots(state.shotsInBurst, payload.weaponId, now - lastShotAt)
+	local spreadDeg = Ballistics.spread(payload.weaponId, {
+		shotsInBurst = state.shotsInBurst,
+		sprinting = player:GetAttribute("Sprinting") == true,
+	})
+	state.shotsInBurst = math.min(state.shotsInBurst + 1, Ballistics.maxShots(payload.weaponId))
+
 	local pellets = spec.Pellets or 1
 	local rng = Random.new()
+	local up = if Ballistics.safeUpAxis(payload.direction.Y) == "Z" then Vector3.zAxis else Vector3.yAxis
+	local aimFrame = CFrame.lookAt(Vector3.zero, payload.direction, up)
 	for _ = 1, pellets do
-		local direction = payload.direction
-		if pellets > 1 then
-			direction = (direction + Vector3.new(
-				rng:NextNumber(-0.06, 0.06),
-				rng:NextNumber(-0.06, 0.06),
-				rng:NextNumber(-0.06, 0.06)
-			)).Unit
-		end
+		local offset = Ballistics.coneOffset(spreadDeg, rng:NextNumber(), rng:NextNumber())
+		local direction = (aimFrame * CFrame.Angles(math.rad(offset.pitchDeg), math.rad(offset.yawDeg), 0)).LookVector
 		self:_hitscan(player, character :: Model, payload.origin, direction, spec)
 	end
 
@@ -536,6 +543,8 @@ function CombatService:handleSprint(player: Player, payload: { sprinting: string
 	end
 	local h = humanoid :: Humanoid
 	h.WalkSpeed = speed
+	-- Read back by the server's own spread roll: firing from a sprint is inaccurate.
+	player:SetAttribute("Sprinting", sprinting)
 end
 
 -- Wiring -------------------------------------------------------------------------

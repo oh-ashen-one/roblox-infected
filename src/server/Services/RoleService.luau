@@ -55,22 +55,41 @@ local function applyZombieAppearance(character: Model)
 	end
 	for _, part in character:GetDescendants() do
 		if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-			part.Color = Color3.fromRGB(88, 160, 70)
-			part.Material = Enum.Material.Slate
+			-- Brighter and slightly emissive. The old dark Slate green sat within a few
+			-- shades of the concrete floors, which is most of why zombies were unreadable.
+			part.Color = Color3.fromRGB(126, 226, 96)
+			part.Material = Enum.Material.Neon
 		elseif part:IsA("Shirt") or part:IsA("Pants") or part:IsA("ShirtGraphic") then
 			part:Destroy()
 		end
 	end
+
+	-- Outline so a zombie reads instantly against any wall at any light level.
+	--
+	-- PATIENT ZERO GUARD: this function is only ever called for a confirmed ZOMBIE. It must
+	-- never be reached for PATIENT_ZERO — the hidden PZ looks exactly like a survivor, and
+	-- that mind-game is the whole game. DepthMode is Occluded, not AlwaysOnTop, so this is a
+	-- readability aid and not a sanctioned wallhack.
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "InfectionOutline"
+	highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+	highlight.FillColor = Color3.fromRGB(80, 220, 60)
+	highlight.FillTransparency = 0.75
+	highlight.OutlineColor = Color3.fromRGB(180, 255, 140)
+	highlight.OutlineTransparency = 0
+	highlight.Parent = character
+
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if root and root:IsA("BasePart") then
 		local particles = Instance.new("ParticleEmitter")
 		particles.Name = "InfectionAura"
 		particles.Color = ColorSequence.new(Color3.fromRGB(90, 200, 60))
 		particles.Lifetime = NumberRange.new(0.4, 0.9)
-		particles.Rate = 12
+		particles.Rate = 35
 		particles.Speed = NumberRange.new(0.5, 1.5)
-		particles.Size = NumberSequence.new(0.25)
-		particles.Transparency = NumberSequence.new(0.4)
+		particles.Size = NumberSequence.new(0.6)
+		particles.Transparency = NumberSequence.new(0.35)
+		particles.LightEmission = 0.5
 		particles.Parent = root
 	end
 end
@@ -385,6 +404,11 @@ function RoleService:_abilityCloak(player: Player, character: Model, humanoid: H
 			part.Enabled = false
 		end
 	end
+	-- The readability outline has to go too, or cloaking hides nothing.
+	local outline = character:FindFirstChild("InfectionOutline")
+	if outline and outline:IsA("Highlight") then
+		outline.Enabled = false
+	end
 	task.delay(GameConfig.Cloak.Duration, function()
 		if player.Character ~= character then
 			return
@@ -397,6 +421,10 @@ function RoleService:_abilityCloak(player: Player, character: Model, humanoid: H
 		local aura = character:FindFirstChild("InfectionAura", true)
 		if aura and aura:IsA("ParticleEmitter") and humanoid.Health > 0 then
 			aura.Enabled = true
+		end
+		local cloakedOutline = character:FindFirstChild("InfectionOutline")
+		if cloakedOutline and cloakedOutline:IsA("Highlight") and humanoid.Health > 0 then
+			cloakedOutline.Enabled = true
 		end
 	end)
 end

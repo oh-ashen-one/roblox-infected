@@ -47,7 +47,22 @@ local function buildTag(character: Model, player: Player)
 	end
 	refresh()
 	character:GetAttributeChangedSignal("InfectedTitle"):Connect(refresh)
-	local _ = name
+
+	-- Role colouring. We deliberately infer "is a zombie" from the InfectionOutline the
+	-- server attaches to converted characters rather than replicating a role attribute.
+	--
+	-- PATIENT ZERO GUARD: the outline only ever exists on a confirmed ZOMBIE, so a hidden PZ
+	-- keeps the plain survivor tag. Inferring from an instance the server already replicates
+	-- means this adds no new information channel that could expose them.
+	local function refreshRole()
+		local infected = character:FindFirstChild("InfectionOutline") ~= nil
+		name.TextColor3 = infected and Theme.Colors.Infected or Theme.Colors.Text
+		-- Zombies stay legible further out; a survivor tag would just be clutter at range.
+		gui.MaxDistance = infected and 130 or 80
+	end
+	refreshRole()
+	character.ChildAdded:Connect(refreshRole)
+	character.ChildRemoved:Connect(refreshRole)
 end
 
 function Nametags.start(_remotes: any)

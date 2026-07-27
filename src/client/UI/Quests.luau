@@ -4,6 +4,7 @@
 -- fires ClaimQuest. A pip on the toggle flags when something is claimable.
 
 local Theme = require(script.Parent.Theme)
+local MenuState = require(script.Parent.MenuState)
 
 local Quests = {}
 
@@ -68,6 +69,8 @@ function Quests.start(remotes: any)
 		BackgroundColor3 = Theme.Colors.Panel,
 		Visible = false,
 	})
+	-- Releases the locked mouse while this panel is open.
+	MenuState.track(panel)
 	Theme.corner(panel, 14)
 	Theme.gradient(panel, Theme.Colors.PanelLight, Theme.Colors.Panel, 90)
 	Theme.stroke(panel, Color3.fromRGB(60, 64, 78), 1, 0.3)

@@ -225,11 +225,14 @@ function BotService:_buildRig(name: string, spawnCFrame: CFrame): (Model, Humano
 	humanoid.Parent = model
 
 	local nameTag = Instance.new("BillboardGui")
+	nameTag.Name = "BotNametag"
 	nameTag.Size = UDim2.new(0, 100, 0, 24)
 	nameTag.StudsOffset = Vector3.new(0, 2.4, 0)
 	nameTag.AlwaysOnTop = false
+	nameTag.MaxDistance = 80
 	nameTag.Parent = head
 	local label = Instance.new("TextLabel")
+	label.Name = "BotName"
 	label.Size = UDim2.new(1, 0, 1, 0)
 	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.GothamMedium
@@ -257,11 +260,42 @@ function BotService:_applyRole(bot: Bot, role: string)
 			bot.humanoid.Health = GameConfig.Combat.ZombieBaseHealth
 			for _, part in bot.model:GetDescendants() do
 				if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-					part.Color = Color3.fromRGB(88, 160, 70)
-					part.Material = Enum.Material.Slate
+					part.Color = Color3.fromRGB(126, 226, 96)
+					part.Material = Enum.Material.Neon
 				end
 			end
+			BotService._markInfected(bot.model)
 		end
+	end
+end
+
+-- Same readability treatment player zombies get, so a bot zombie and a player zombie look
+-- identical to a survivor scanning a room.
+--
+-- PATIENT ZERO GUARD: only reached for role == "ZOMBIE". A bot Patient Zero must keep the
+-- plain survivor look exactly like a human PZ does.
+function BotService._markInfected(model: Model)
+	if model:FindFirstChild("InfectionOutline") then
+		return
+	end
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "InfectionOutline"
+	highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+	highlight.FillColor = Color3.fromRGB(80, 220, 60)
+	highlight.FillTransparency = 0.75
+	highlight.OutlineColor = Color3.fromRGB(180, 255, 140)
+	highlight.Parent = model
+
+	-- The tag was built once at spawn and never updated, so converted bots kept a white
+	-- survivor name for the rest of the round.
+	local head = model:FindFirstChild("Head")
+	local tag = head and head:FindFirstChild("BotNametag")
+	local label = tag and tag:FindFirstChild("BotName")
+	if tag and tag:IsA("BillboardGui") then
+		tag.MaxDistance = 130
+	end
+	if label and label:IsA("TextLabel") then
+		label.TextColor3 = Color3.fromRGB(126, 226, 96)
 	end
 end
 

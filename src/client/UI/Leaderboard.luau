@@ -3,6 +3,7 @@
 -- pushed from the server. Read-only; refreshes whenever a Leaderboard broadcast arrives.
 
 local Theme = require(script.Parent.Theme)
+local MenuState = require(script.Parent.MenuState)
 
 local Leaderboard = {}
 
@@ -75,6 +76,8 @@ function Leaderboard.start(remotes: any)
 		BackgroundColor3 = Theme.Colors.Panel,
 		Visible = false,
 	})
+	-- Releases the locked mouse while this panel is open.
+	MenuState.track(panel)
 	Theme.corner(panel, 14)
 	Theme.gradient(panel, Theme.Colors.PanelLight, Theme.Colors.Panel, 90)
 	Theme.stroke(panel, Color3.fromRGB(60, 64, 78), 1, 0.3)
