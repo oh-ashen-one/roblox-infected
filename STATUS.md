@@ -70,13 +70,13 @@ write, universe 10518289514) once, put it in `ROBLOX_API_KEY` or
 playtest first.
 
 - **Phase D — content:** + Pouncer zombie class with a player-activated **lunge** ability
-  (server-authoritative, anti-cheat-safe), **5 maps** (added Warehouse + Metro), and a
+  (server-authoritative, anti-cheat-safe), **3 maps** (Warehouse + Metro were cut), and a
   3-random-candidate vote that scales to any map count.
 - **Phase E — social:** + native **friend-invite** button (SocialService).
 - **Phase H — cosmetics:** + **kill-effect** slot (5 effects) obtainable via crates/equip.
 
 **Headless validation:** `run-in-roblox` boot check PASSES on the full integrated build —
-server boots, 0 script errors, and all 5 maps have valid survivor+zombie spawns
+server boots, 0 script errors, and all 3 maps have valid survivor+zombie spawns
 (`tests/studio-smoke.lua`).
 
 - **Phase A — ragdoll:** bot deaths fling a physics ragdoll corpse (cloned parts +

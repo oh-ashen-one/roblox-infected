@@ -4,8 +4,8 @@
 -- Rebuilt from six byte-identical flat-roofed boxes into a street with four house layouts,
 -- walkable roofs, real windows, and three landmarks that give the map a shape you can call
 -- out: the GAS STATION (open canopy, long sightlines), the CHURCH (the map's high ground,
--- reachable only by a ladder you can be caught on), and the PARK (open ground you cross at
--- your peril).
+-- up switchback stairs or a faster, more exposed ladder), and the PARK (open ground you
+-- cross at your peril).
 --
 -- The design goal is verticality and named places. Roof-to-roof routes let survivors break
 -- line of sight upward, which the original map — a single flat plane — had no answer for.
@@ -73,14 +73,17 @@ local function house(
 	Kit.railing(geo, x, z + d / 2, w, topY, true, roofProps)
 	Kit.railing(geo, x, z - d / 2, w, topY, true, roofProps)
 
-	-- Ways up. Every house is climbable; that is the point of the rebuild.
+	-- Ways up. Stairs are the primary route because Humanoids (and therefore bots) walk them
+	-- natively; the ladders are a player shortcut on top. An elevated position that only a
+	-- ladder reaches would be a camping spot the horde could never answer.
+	local stairX = x + w / 2 + 5
+	Kit.floor(geo, stairX, z, 10, d * 0.9, GROUND + 0.2, woodProps)
+	Kit.stairs(geo, stairX, z - d * 0.3, 9, GROUND, topY, 22, "+Z", woodProps)
+	Kit.railing(geo, stairX + 5, z, d * 0.9, topY, false, woodProps)
 	if variant == 2 then
 		Kit.catwalk(geo, x, z + facing * (d / 2 + 4), w * 0.6, 8, GROUND + wallH, woodProps)
-		Kit.stairs(geo, x + 6, z, 8, GROUND, GROUND + wallH, 12, "+Z", woodProps)
-		Kit.ladder(geo, x + w / 2 - 2, z + facing * (d / 2 + 6), GROUND + wallH, topY, { Color = C.Metal })
-	else
-		Kit.ladder(geo, x - w / 2 + 2, z - facing * (d / 2 - 2), GROUND, topY, { Color = C.Metal })
 	end
+	Kit.ladder(geo, x - w / 2 + 2, z - facing * (d / 2 - 2), GROUND, topY, { Color = C.Metal })
 
 	-- Porch or carport.
 	if variant == 3 then
@@ -168,14 +171,18 @@ local function church(geo: Instance, patrol: Instance, x: number, z: number)
 		Kit.box(geo, x, GROUND, z + i * 7, 30, 2.5, 2, wood)
 	end
 
-	-- Tower: the highest point on the map. The only way up is a ladder, so holding it is
-	-- powerful but committal — you can be caught halfway.
+	-- Tower: the highest point on the map, and worth contesting.
 	local tx, tz = x, z - 40
 	Kit.floor(geo, tx, tz, 18, 18, GROUND + 0.2, stone)
 	Kit.wallZ(geo, tx - 9, tz, 18, 40, GROUND, stone)
 	Kit.wallZ(geo, tx + 9, tz, 18, 40, GROUND, stone)
 	Kit.wallX(geo, tx, tz - 9, 18, 40, GROUND, stone)
 	Kit.wallXDoor(geo, tx, tz + 9, 18, 40, GROUND, 8, stone)
+	-- Switchback stairs up the tower, so the map's high ground is contestable by anything
+	-- that walks. The ladder beside them is the fast, exposed way.
+	Kit.stairs(geo, tx - 5, tz, 7, GROUND, GROUND + 20, 16, "+Z", stone)
+	Kit.floor(geo, tx, tz, 18, 8, GROUND + 20, stone)
+	Kit.stairs(geo, tx + 5, tz, 7, GROUND + 20, GROUND + 40, 16, "-Z", stone)
 	Kit.ladder(geo, tx + 6, tz - 6, GROUND, GROUND + 40, { Color = C.Metal })
 	Kit.floor(geo, tx, tz, 18, 18, GROUND + 40, stone)
 	Kit.railing(geo, tx, tz - 9, 18, GROUND + 40, true, stone)
@@ -325,6 +332,12 @@ return {
 		Kit.spawnMarker(zombieSpawns, 142, GROUND, 0)
 		Kit.spawnMarker(zombieSpawns, 0, GROUND, -102)
 		Kit.spawnMarker(zombieSpawns, 0, GROUND, 102)
+		-- Elevated zombie spawns: a survivor holding a roof is never unreachable, even if
+		-- the navmesh declines to route a bot up the stairs.
+		Kit.spawnMarker(zombieSpawns, -105, GROUND + 10, -55)
+		Kit.spawnMarker(zombieSpawns, 35, GROUND + 10, 55)
+		Kit.spawnMarker(zombieSpawns, 105, GROUND + 40, 15)
+		Kit.spawnMarker(zombieSpawns, 100, GROUND + 13, -50)
 
 		return map
 	end,
