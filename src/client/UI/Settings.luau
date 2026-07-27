@@ -229,7 +229,7 @@ function Settings.start()
 		if listening == nil or gameProcessed then
 			return
 		end
-		if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode ~= Enum.KeyCode.Unknown then
+		if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode ~= Enum.KeyCode.None then
 			local action = listening
 			listening = nil
 			Keybinds.set(LocalPlayer, action, input.KeyCode.Name)

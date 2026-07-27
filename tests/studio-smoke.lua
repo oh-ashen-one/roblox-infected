@@ -50,9 +50,17 @@ if mapsFolder then
 		local zoCount = zo and #zo:GetChildren() or 0
 		if svCount == 0 or zoCount == 0 then
 			mapsOk = false
-			print(("[HEADLESS] MAP %s BAD: survivorSpawns=%d zombieSpawns=%d"):format(mapModel.Name, svCount, zoCount))
+			print(
+				("[HEADLESS] MAP %s BAD: survivorSpawns=%d zombieSpawns=%d"):format(
+					mapModel.Name,
+					svCount,
+					zoCount
+				)
+			)
 		else
-			print(("[HEADLESS] map %s: %d survivor / %d zombie spawns"):format(mapModel.Name, svCount, zoCount))
+			print(
+				("[HEADLESS] map %s: %d survivor / %d zombie spawns"):format(mapModel.Name, svCount, zoCount)
+			)
 		end
 	end
 else

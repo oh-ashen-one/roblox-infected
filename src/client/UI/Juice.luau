@@ -19,7 +19,6 @@ local HapticService = game:GetService("HapticService")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local GameConfig = require(Shared.GameConfig)
 local SkinCatalog = require(Shared.SkinCatalog)
 
 local Theme = require(script.Parent.Theme)
