@@ -192,6 +192,25 @@ botService = BotService.new({
 	onCountsChanged = function()
 		refreshCounts()
 	end,
+	-- Lets bot bullets hurt a human zombie. Without it bots could only damage other bots.
+	damageInfectedPlayer = function(character: Model, amount: number)
+		local victim = Players:GetPlayerFromCharacter(character)
+		if victim == nil then
+			return
+		end
+		-- PATIENT ZERO GUARD: bots must never damage the hidden PZ, or the reaction
+		-- (and the kill feed) would expose who they are.
+		if roleService:getRole(victim) ~= "ZOMBIE" then
+			return
+		end
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		if humanoid and humanoid.Health > 0 and character:FindFirstChildOfClass("ForceField") == nil then
+			humanoid:TakeDamage(amount)
+		end
+	end,
+	getPatrolPoint = function()
+		return mapService:randomPatrolPoint()
+	end,
 })
 
 local combatService = CombatService.new({

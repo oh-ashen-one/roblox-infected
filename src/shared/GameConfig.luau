@@ -179,16 +179,56 @@ local GameConfig = {
 		-- Survivor bots shooting back at VISIBLE zombies (never the hidden PZ — that would
 		-- leak the mind-game). Human-like: only when they have line of sight, with a delay.
 		ShootRange = 60,
-		ShootInterval = 0.9, -- min seconds between a survivor bot's shots
+		ShootInterval = 0.55, -- median seconds between a survivor bot's shots
+		ShootIntervalJitter = 0.35, -- +/- randomisation so bots don't fire like a metronome
 		ShootReactionMin = 0.25, -- random aim delay before the first shot
 		ShootReactionMax = 0.7,
-		ShootAccuracy = 0.7, -- fraction of shots that actually land (rest miss cosmetically)
+		ShootSpreadDeg = 3.4, -- bots roll a real cone and raycast; misses are visible
+		BotWeapon = "AssaultRifle", -- which Ballistics profile a survivor bot fires
 
-		-- Difficulty tiers rolled per-bot at spawn; scales chase speed + reaction.
+		-- Perception. Bots used to see 360 degrees with no memory of a lost target.
+		VisionConeDeg = 110,
+		PeripheralRange = 10, -- inside this you're noticed regardless of facing
+		MemorySeconds = 6, -- how long a lost target stays worth searching for
+		HearingRange = 90, -- gunfire within this radius draws bots to the SOUND (never
+		-- to the shooter's identity — that would leak the hidden PZ)
+		SearchRadiusBase = 10,
+		SearchRadiusGrowth = 4,
+
+		-- Zombie bots telegraph before converting instead of touching you to death.
+		MeleeWindup = 0.45,
+
+		-- Difficulty tiers rolled per-bot at spawn. These now scale aim, rate of fire and
+		-- perception too — previously only chase speed and one delay differed, so a Rookie
+		-- and a Veteran shot identically.
 		Difficulties = {
-			{ name = "Rookie", weight = 3, speedMult = 0.92, reactionMult = 1.5 },
-			{ name = "Regular", weight = 4, speedMult = 1.0, reactionMult = 1.0 },
-			{ name = "Veteran", weight = 2, speedMult = 1.06, reactionMult = 0.7 },
+			{
+				name = "Rookie",
+				weight = 3,
+				speedMult = 0.92,
+				reactionMult = 1.5,
+				spreadMult = 1.8,
+				fireRateMult = 1.45,
+				sightMult = 0.8,
+			},
+			{
+				name = "Regular",
+				weight = 4,
+				speedMult = 1.0,
+				reactionMult = 1.0,
+				spreadMult = 1.0,
+				fireRateMult = 1.0,
+				sightMult = 1.0,
+			},
+			{
+				name = "Veteran",
+				weight = 2,
+				speedMult = 1.06,
+				reactionMult = 0.7,
+				spreadMult = 0.55,
+				fireRateMult = 0.75,
+				sightMult = 1.2,
+			},
 		},
 		-- Personalities bias survivor behaviour (roam vs group vs hide).
 		Personalities = { "roamer", "grouper", "cautious", "aggressive" },

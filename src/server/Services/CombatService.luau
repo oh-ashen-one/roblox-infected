@@ -220,6 +220,12 @@ function CombatService:handleFireWeapon(
 		self:_hitscan(player, character :: Model, payload.origin, direction, spec)
 	end
 
+	-- Bots hear the shot and investigate. Deliberately position-only: passing the shooter
+	-- would let bots react to the hidden Patient Zero and leak the mind-game.
+	if self._deps.botService and self._deps.botService.noteGunshot then
+		self._deps.botService:noteGunshot(payload.origin)
+	end
+
 	-- Broadcast for tracer/sound rendering on other clients
 	self._deps.remotes.fireAllClients("ShotFired", {
 		shooterUserId = player.UserId,

@@ -189,6 +189,25 @@ end
 
 -- Nearest zombie spawn to any survivor that is >=25 studs away and has no clear
 -- line of sight to a survivor; falls back to random.
+-- A wander destination for bots. Prefers map-authored PatrolPoints; falls back to spawn
+-- markers so this works on maps that predate them. Bots previously wandered between spawn
+-- markers only, which made them ping-pong and clump in the same few spots every round.
+function MapService:randomPatrolPoint(): Vector3?
+	local active = workspace:FindFirstChild("ActiveMap")
+	local folder = active and active:FindFirstChild("PatrolPoints")
+	if folder then
+		local points = folder:GetChildren()
+		if #points > 0 then
+			local pick = points[math.random(1, #points)]
+			if pick:IsA("BasePart") then
+				return pick.Position
+			end
+		end
+	end
+	local spawn = self:randomSurvivorSpawn()
+	return spawn and spawn.Position or nil
+end
+
 function MapService:zombieSpawnNearAction(survivorRoots: { BasePart }): CFrame?
 	local spawns = self:_spawnsIn("ZombieSpawns")
 	if #spawns == 0 then

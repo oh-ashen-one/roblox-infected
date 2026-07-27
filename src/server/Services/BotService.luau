@@ -1,14 +1,17 @@
 --!strict
--- Server-controlled bots so a solo player can experience a full round. Bots are
--- lightweight NPC rigs (no avatar assets) with a Humanoid, so the existing combat
--- raycasts hit them. They fill the lobby to a target headcount, get assigned roles
--- alongside the human, and are cleaned up at round end.
+-- Server-controlled bots so a solo player can experience a full round. Bots are real
+-- animated R15 avatars (Shared.Rig) with a Humanoid, so the existing combat raycasts hit
+-- them. They fill the lobby to a target headcount, get assigned roles alongside the human,
+-- and are cleaned up at round end.
 --
 -- AI: each bot navigates with PathfindingService (paths around walls, recovers when
--- wedged) and has a rolled difficulty tier + personality. Survivors roam / group /
--- flee visible infected and shoot back at visible zombies; infected chase, and the
--- Patient Zero stalks the most isolated survivor. The hidden PZ is never surfaced to
--- bot senses, so their reactions can't leak the mind-game.
+-- wedged) and runs a real state machine (Shared.BotBrain) over a perception snapshot
+-- (Shared.BotVision): a vision cone rather than 360-degree awareness, memory of where a
+-- target was last seen, hearing for nearby gunfire, and a stagger reaction when shot.
+-- Survivor bots fire real raycasts through the same spread model players use, so their
+-- misses are visible. Infected chase, and the Patient Zero stalks the most isolated
+-- survivor. The hidden PZ is never surfaced to bot senses, so their reactions can't leak
+-- the mind-game.
 --
 -- Bot characters are tagged with attributes the combat + AI code reads:
 --   IsBot   = true
@@ -21,6 +24,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared.GameConfig)
+local Ballistics = require(Shared.Ballistics)
+local BotBrain = require(Shared.BotBrain)
+local BotVision = require(Shared.BotVision)
+
+local Rig = require(script.Parent.Parent.Bots.Rig)
 
 local BotService = {}
 BotService.__index = BotService
@@ -43,6 +51,12 @@ export type Deps = {
 	onConversionOccurred: () -> (),
 	-- Counts changed -> re-aggregate survivor total for the round machine.
 	onCountsChanged: () -> (),
+	-- A bot shot a human zombie. Without this bot bullets could only ever hurt other bots,
+	-- which made bots cosmetic in any fight involving a real player.
+	damageInfectedPlayer: ((character: Model, amount: number) -> ())?,
+	-- A patrol point from the active map, so bots explore instead of ping-ponging between
+	-- spawn markers.
+	getPatrolPoint: (() -> Vector3?)?,
 }
 
 type Difficulty = { name: string, weight: number, speedMult: number, reactionMult: number }
@@ -73,9 +87,22 @@ type Bot = {
 	-- survivor gunfire
 	nextShotAt: number,
 	aimingSince: number?,
+	-- brain + perception
+	brain: any,
+	brainConfig: any,
+	lastKnown: Vector3?,
+	lastContact: number,
+	justDamaged: boolean,
+	thinkPhase: number,
+	nextThink: number,
+	searchTarget: Vector3?,
+	windupUntil: number?,
+	cleanupAnim: (() -> ())?,
 }
 
-local NAMES = {
+-- Roblox-looking display names. The old list was 20 entries all suffixed " [bot]", which
+-- announced itself instantly; these read like the usernames around them.
+local NAME_STEMS = {
 	"Ava",
 	"Cole",
 	"Dax",
@@ -96,6 +123,34 @@ local NAMES = {
 	"Sol",
 	"Tess",
 	"Vera",
+	"Zane",
+	"Bex",
+	"Nova",
+	"Rook",
+	"Vale",
+	"Wren",
+	"Jax",
+	"Kira",
+	"Onyx",
+	"Sable",
+}
+
+local NAME_STYLES = {
+	function(stem, _n)
+		return stem
+	end,
+	function(stem, n)
+		return stem .. tostring(n)
+	end,
+	function(stem, _n)
+		return "x" .. stem
+	end,
+	function(stem, n)
+		return stem .. "_" .. tostring(n)
+	end,
+	function(stem, _n)
+		return "the" .. stem
+	end,
 }
 
 local rng = Random.new()
@@ -166,85 +221,48 @@ end
 
 -- Rig ---------------------------------------------------------------------------
 
-local function makePart(name: string, size: Vector3, color: Color3): Part
-	local part = Instance.new("Part")
-	part.Name = name
-	part.Size = size
-	part.Color = color
-	part.Material = Enum.Material.SmoothPlastic
-	part.TopSurface = Enum.SurfaceType.Smooth
-	part.BottomSurface = Enum.SurfaceType.Smooth
-	return part
-end
+function BotService:_buildRig(name: string, spawnCFrame: CFrame): (Model, Humanoid, BasePart, (() -> ())?)
+	-- Real animated avatar, with the old block rig as an automatic fallback.
+	local model, humanoid, root = Rig.build(name, rng)
 
-local function weld(a: BasePart, b: BasePart)
-	local w = Instance.new("Weld")
-	w.Part0 = a
-	w.Part1 = b
-	w.C0 = a.CFrame:Inverse() * b.CFrame
-	w.Parent = a
-end
-
-function BotService:_buildRig(name: string, spawnCFrame: CFrame): (Model, Humanoid, BasePart)
-	local model = Instance.new("Model")
-	model.Name = name
-
-	local skin = Color3.fromRGB(210, 180, 140)
-	local shirt = Color3.fromRGB(70, 90, 130)
-
-	local root = makePart("HumanoidRootPart", Vector3.new(2, 2, 1), shirt)
-	root.Transparency = 1
-	root.CFrame = spawnCFrame + Vector3.new(0, 3, 0)
-	root.Parent = model
-
-	local torso = makePart("Torso", Vector3.new(2, 2, 1), shirt)
-	torso.CFrame = root.CFrame
-	torso.Parent = model
-	weld(root, torso)
-
-	local head = makePart("Head", Vector3.new(1.4, 1.2, 1.4), skin)
-	head.CFrame = torso.CFrame * CFrame.new(0, 1.6, 0)
-	head.Parent = model
-	weld(torso, head)
-
-	local legL = makePart("LeftLeg", Vector3.new(0.8, 2, 0.9), Color3.fromRGB(45, 55, 75))
-	legL.CFrame = torso.CFrame * CFrame.new(-0.5, -2, 0)
-	legL.Parent = model
-	weld(torso, legL)
-	local legR = makePart("RightLeg", Vector3.new(0.8, 2, 0.9), Color3.fromRGB(45, 55, 75))
-	legR.CFrame = torso.CFrame * CFrame.new(0.5, -2, 0)
-	legR.Parent = model
-	weld(torso, legR)
-
-	local humanoid = Instance.new("Humanoid")
-	humanoid.RigType = Enum.HumanoidRigType.R6
 	humanoid.MaxHealth = GameConfig.Combat.SurvivorMaxHealth
 	humanoid.Health = GameConfig.Combat.SurvivorMaxHealth
 	humanoid.WalkSpeed = GameConfig.Movement.BaseWalkSpeed
-	humanoid.HipHeight = 2
-	humanoid.Parent = model
+	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 
-	local nameTag = Instance.new("BillboardGui")
-	nameTag.Name = "BotNametag"
-	nameTag.Size = UDim2.new(0, 100, 0, 24)
-	nameTag.StudsOffset = Vector3.new(0, 2.4, 0)
-	nameTag.AlwaysOnTop = false
-	nameTag.MaxDistance = 80
-	nameTag.Parent = head
-	local label = Instance.new("TextLabel")
-	label.Name = "BotName"
-	label.Size = UDim2.new(1, 0, 1, 0)
-	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamMedium
-	label.TextSize = 13
-	label.TextColor3 = Color3.fromRGB(230, 230, 235)
-	label.TextStrokeTransparency = 0.5
-	label.Text = name
-	label.Parent = nameTag
+	local head = model:FindFirstChild("Head")
+	if head and head:IsA("BasePart") then
+		local nameTag = Instance.new("BillboardGui")
+		nameTag.Name = "BotNametag"
+		nameTag.Size = UDim2.new(0, 100, 0, 24)
+		nameTag.StudsOffset = Vector3.new(0, 2.4, 0)
+		nameTag.AlwaysOnTop = false
+		nameTag.MaxDistance = 80
+		nameTag.Parent = head
+		local label = Instance.new("TextLabel")
+		label.Name = "BotName"
+		label.Size = UDim2.new(1, 0, 1, 0)
+		label.BackgroundTransparency = 1
+		label.Font = Enum.Font.GothamMedium
+		label.TextSize = 13
+		label.TextColor3 = Color3.fromRGB(230, 230, 235)
+		label.TextStrokeTransparency = 0.5
+		label.Text = name
+		label.Parent = nameTag
+	end
 
 	model.PrimaryPart = root
 	model.Parent = workspace
-	return model, humanoid, root
+	root.CFrame = spawnCFrame + Vector3.new(0, 3, 0)
+
+	-- Animations must be started after the rig is parented so the Animator replicates.
+	local cleanupAnim: (() -> ())? = nil
+	local ok, cleanup = pcall(Rig.animate, humanoid, rng)
+	if ok then
+		cleanupAnim = cleanup
+	end
+
+	return model, humanoid, root, cleanupAnim
 end
 
 -- Role appearance ----------------------------------------------------------------
@@ -309,8 +327,10 @@ function BotService:spawnForRound(count: number, opts: { botIsPZ: boolean })
 		local spawnCFrame = self._deps.getSurvivorSpawn() or CFrame.new(0, 5, 0)
 		local id = self._nextId
 		self._nextId += 1
-		local name = NAMES[((id - 1) % #NAMES) + 1] .. " [bot]"
-		local model, humanoid, root = self:_buildRig(name, spawnCFrame)
+		local stem = NAME_STEMS[((id - 1) % #NAME_STEMS) + 1]
+		local style = NAME_STYLES[rng:NextInteger(1, #NAME_STYLES)]
+		local name = style(stem, rng:NextInteger(2, 99))
+		local model, humanoid, root, cleanupAnim = self:_buildRig(name, spawnCFrame)
 		model:SetAttribute("IsBot", true)
 		model:SetAttribute("BotId", id)
 		local personalities = GameConfig.Bots.Personalities
@@ -337,7 +357,22 @@ function BotService:spawnForRound(count: number, opts: { botIsPZ: boolean })
 			stuckSince = nil,
 			nextShotAt = 0,
 			aimingSince = nil,
+			brain = BotBrain.newMemory("PATROL", os.clock()),
+			brainConfig = nil,
+			lastKnown = nil,
+			lastContact = 0,
+			justDamaged = false,
+			-- Stagger think ticks across the interval: every bot used to decide on the same
+			-- frame, which both spiked the frame time and made them move in lockstep.
+			thinkPhase = ((id % 5) / 5) * GameConfig.Bots.ThinkInterval,
+			nextThink = os.clock() + ((id % 5) / 5) * GameConfig.Bots.ThinkInterval,
+			searchTarget = nil,
+			windupUntil = nil,
+			cleanupAnim = cleanupAnim,
 		}
+		bot.brainConfig = BotBrain.configFor(bot.personality, {
+			engageRange = GameConfig.Bots.ShootRange * bot.difficulty.sightMult,
+		})
 		self._bots[id] = bot
 		self:_applyRole(bot, if i == pzIndex then "PATIENT_ZERO" else "SURVIVOR")
 		humanoid.Died:Connect(function()
@@ -350,6 +385,9 @@ end
 function BotService:clear()
 	self._active = false
 	for id, bot in self._bots do
+		if bot.cleanupAnim then
+			bot.cleanupAnim()
+		end
 		bot.model:Destroy()
 		self._bots[id] = nil
 	end
@@ -374,6 +412,14 @@ function BotService:damageBot(character: Model, amount: number, attacker: Player
 	if bot == nil or bot.role ~= "ZOMBIE" then
 		return false
 	end
+	self:_reactToDamage(
+		bot,
+		if attacker and attacker.Character
+			then (attacker.Character:FindFirstChild("HumanoidRootPart") :: BasePart?) and (
+				attacker.Character.HumanoidRootPart :: BasePart
+			).Position
+			else nil
+	)
 	bot.humanoid:TakeDamage(amount)
 	if bot.humanoid.Health <= 0 then
 		if attacker then
@@ -436,40 +482,68 @@ end
 
 function BotService:_spawnCorpse(bot: Bot)
 	local src = bot.model
+
+	-- Rig-agnostic ragdoll: clone every visible part and rebuild the skeleton from the
+	-- rig's own Motor6D topology. The previous version hardcoded the four R6 part names,
+	-- so it silently produced nothing at all on an R15 avatar.
 	local corpse = Instance.new("Model")
 	corpse.Name = "Corpse"
-	local parts: { [string]: BasePart } = {}
-	for _, name in { "Torso", "Head", "LeftLeg", "RightLeg" } do
-		local orig = src:FindFirstChild(name)
-		if orig and orig:IsA("BasePart") then
-			local clone = orig:Clone()
-			-- Strip welds / name-tag / attachments so the clone is a free physics body.
+
+	local clones: { [BasePart]: BasePart } = {}
+	local motors: { Motor6D } = {}
+	for _, descendant in src:GetDescendants() do
+		if descendant:IsA("BasePart") and descendant.Name ~= "HumanoidRootPart" then
+			local clone = descendant:Clone()
+			-- Strip welds / nametags / attachments so the clone is a free physics body.
 			for _, child in clone:GetChildren() do
 				child:Destroy()
 			end
 			clone.Anchored = false
 			clone.CanCollide = true
+			clone.Massless = false
 			clone.Parent = corpse
-			parts[name] = clone
+			clones[descendant] = clone
+		elseif descendant:IsA("Motor6D") then
+			table.insert(motors, descendant)
 		end
 	end
-	if parts.Torso == nil then
+
+	local root: BasePart? = nil
+	for original, clone in clones do
+		if root == nil or original.Size.Magnitude > root.Size.Magnitude then
+			root = clone
+		end
+	end
+	if root == nil then
 		return
 	end
-	corpse.PrimaryPart = parts.Torso
+
+	corpse.PrimaryPart = root
 	corpse.Parent = workspace
-	if parts.Head then
-		socketJoint(parts.Torso, Vector3.new(0, 1, 0), parts.Head, Vector3.new(0, -0.6, 0))
+
+	-- Recreate each joint as a ball socket at the same anchor points the Motor6D used.
+	local jointCount = 0
+	for _, motor in motors do
+		local p0, p1 = motor.Part0, motor.Part1
+		if p0 and p1 then
+			local a, b = clones[p0], clones[p1]
+			if a and b then
+				socketJoint(a, motor.C0.Position, b, motor.C1.Position)
+				jointCount += 1
+			end
+		end
 	end
-	if parts.LeftLeg then
-		socketJoint(parts.Torso, Vector3.new(-0.5, -1, 0), parts.LeftLeg, Vector3.new(0, 1, 0))
+	if jointCount == 0 then
+		-- No usable skeleton (fallback block rig welds, or a rig we don't understand):
+		-- the loose parts still read as a body coming apart, which is fine.
+		jointCount = 0
 	end
-	if parts.RightLeg then
-		socketJoint(parts.Torso, Vector3.new(0.5, -1, 0), parts.RightLeg, Vector3.new(0, 1, 0))
-	end
+
 	-- Flop it: a little pop + spin.
-	parts.Torso.AssemblyLinearVelocity = Vector3.new(rng:NextNumber(-12, 12), 18, rng:NextNumber(-12, 12))
-	parts.Torso.AssemblyAngularVelocity = Vector3.new(rng:NextNumber(-8, 8), rng:NextNumber(-8, 8), 0)
+	local body = root :: BasePart
+	body.AssemblyLinearVelocity = Vector3.new(rng:NextNumber(-12, 12), 18, rng:NextNumber(-12, 12))
+	body.AssemblyAngularVelocity = Vector3.new(rng:NextNumber(-8, 8), rng:NextNumber(-8, 8), 0)
+
 	-- Green death puff.
 	local emitter = Instance.new("ParticleEmitter")
 	emitter.Color = ColorSequence.new(Color3.fromRGB(90, 200, 60))
@@ -478,7 +552,7 @@ function BotService:_spawnCorpse(bot: Bot)
 	emitter.SpreadAngle = Vector2.new(180, 180)
 	emitter.Rate = 0
 	emitter.Enabled = false
-	emitter.Parent = parts.Torso
+	emitter.Parent = body
 	emitter:Emit(24)
 	Debris:AddItem(corpse, 5)
 end
@@ -495,6 +569,7 @@ function BotService:_onBotDied(bot: Bot)
 			part.Transparency = 1
 		end
 	end
+
 	task.delay(GameConfig.Round.ZombieRespawnSeconds, function()
 		if not self._active or self._bots[bot.id] == nil then
 			return
@@ -508,14 +583,41 @@ function BotService:_onBotDied(bot: Bot)
 			end
 		end
 		local spawnCFrame = self._deps.getZombieSpawn(roots) or CFrame.new(0, 5, 0)
-		bot.root.CFrame = spawnCFrame + Vector3.new(0, 3, 0)
-		bot.humanoid.Health = bot.humanoid.MaxHealth
-		-- Restore the rig now that the corpse has flopped away.
-		for _, part in bot.model:GetDescendants() do
-			if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-				part.Transparency = 0
-			end
+
+		-- A dead Humanoid cannot be revived — Roblox treats the Dead state as terminal, so
+		-- restoring Health just left a frozen, mute body standing at the spawn point and the
+		-- horde quietly stopped existing. Rebuild the rig instead.
+		if bot.cleanupAnim then
+			bot.cleanupAnim()
+			bot.cleanupAnim = nil
 		end
+		bot.model:Destroy()
+
+		local model, humanoid, root, cleanupAnim = self:_buildRig(bot.name, spawnCFrame)
+		model:SetAttribute("IsBot", true)
+		model:SetAttribute("BotId", bot.id)
+		bot.model = model
+		bot.humanoid = humanoid
+		bot.root = root
+		bot.cleanupAnim = cleanupAnim
+
+		-- Reset navigation and perception; the old path led to wherever it died.
+		bot.path = nil
+		bot.waypoints = {}
+		bot.waypointIndex = 1
+		bot.navGoal = nil
+		bot.wanderTarget = nil
+		bot.searchTarget = nil
+		bot.lastKnown = nil
+		bot.windupUntil = nil
+		bot.justDamaged = false
+		bot.lastPos = root.Position
+		bot.brain = BotBrain.newMemory("STALK", os.clock())
+
+		self:_applyRole(bot, "ZOMBIE")
+		humanoid.Died:Connect(function()
+			self:_onBotDied(bot)
+		end)
 	end)
 end
 
@@ -574,6 +676,85 @@ function BotService:_lineOfSight(bot: Bot, targetPos: Vector3): boolean
 	end
 	-- Something was hit; treat as visible only if it's basically at the target.
 	return (result.Position - targetPos).Magnitude < 5
+end
+
+-- Compass heading of a direction, in degrees. Used for the vision cone.
+local function yawOf(direction: Vector3): number
+	return math.deg(math.atan2(direction.X, direction.Z))
+end
+
+-- Can this bot actually perceive a point? Range + vision cone + line of sight.
+--
+-- The cone is the important addition: bots previously had 360-degree awareness, so they
+-- could never be flanked and never be surprised.
+function BotService:_canSee(bot: Bot, targetPos: Vector3): boolean
+	local delta = targetPos - bot.root.Position
+	local dist = delta.Magnitude
+	if dist < 1e-3 then
+		return true
+	end
+	local facing = yawOf(bot.root.CFrame.LookVector)
+	local toTarget = yawOf(delta.Unit)
+	return BotVision.canSee(
+		dist,
+		facing,
+		toTarget,
+		self:_lineOfSight(bot, targetPos),
+		GameConfig.Bots.SightRange * bot.difficulty.sightMult,
+		GameConfig.Bots.VisionConeDeg,
+		GameConfig.Bots.PeripheralRange
+	)
+end
+
+-- Nearest perceivable threat, plus whether it is currently visible. Falls back to the
+-- remembered last-known position so a bot that loses sight goes looking instead of
+-- instantly forgetting the fight it was in.
+function BotService:_perceiveThreat(
+	bot: Bot,
+	now: number,
+	threats: { BasePart }
+): (Vector3?, number?, boolean)
+	local bestPos: Vector3? = nil
+	local bestDist = math.huge
+	for _, threatRoot in threats do
+		local d = (threatRoot.Position - bot.root.Position).Magnitude
+		if d < bestDist and self:_canSee(bot, threatRoot.Position) then
+			bestPos, bestDist = threatRoot.Position, d
+		end
+	end
+	if bestPos then
+		bot.lastKnown = bestPos
+		bot.lastContact = now
+		return bestPos, bestDist, true
+	end
+	if
+		bot.lastKnown and not BotVision.memoryExpired(now - bot.lastContact, GameConfig.Bots.MemorySeconds)
+	then
+		return bot.lastKnown, (bot.lastKnown - bot.root.Position).Magnitude, false
+	end
+	bot.lastKnown = nil
+	return nil, nil, false
+end
+
+-- Gunfire draws bots to the SOUND. Deliberately position-only: attributing a shot to a
+-- shooter would let bots react to the hidden Patient Zero and leak the mind-game.
+function BotService:noteGunshot(origin: Vector3)
+	if not self._active then
+		return
+	end
+	local now = os.clock()
+	for _, bot in self._bots do
+		if bot.humanoid.Health > 0 then
+			local d = (origin - bot.root.Position).Magnitude
+			if BotVision.hearing(d, GameConfig.Bots.HearingRange) > 0 then
+				-- Only follow a noise we don't already have something better than.
+				if bot.lastKnown == nil or (now - bot.lastContact) > 1.5 then
+					bot.lastKnown = origin
+					bot.lastContact = now
+				end
+			end
+		end
+	end
 end
 
 -- Compute a fresh path toward `goal` off the hot loop (ComputeAsync yields).
@@ -675,10 +856,10 @@ function BotService:_survivorGunfire(bot: Bot, now: number, threats: { BasePart 
 		return
 	end
 	local target: BasePart? = nil
-	local bestDist = GameConfig.Bots.ShootRange
+	local bestDist = GameConfig.Bots.ShootRange * bot.difficulty.sightMult
 	for _, threatRoot in threats do
 		local d = (threatRoot.Position - bot.root.Position).Magnitude
-		if d < bestDist and self:_lineOfSight(bot, threatRoot.Position) then
+		if d < bestDist and self:_canSee(bot, threatRoot.Position) then
 			target, bestDist = threatRoot, d
 		end
 	end
@@ -696,21 +877,71 @@ function BotService:_survivorGunfire(bot: Bot, now: number, threats: { BasePart 
 	if now < (bot.aimingSince :: number) then
 		return
 	end
-	bot.nextShotAt = now + GameConfig.Bots.ShootInterval
+
+	-- Jittered cadence. A fixed 0.9s interval read as a metronome.
+	local jitter = GameConfig.Bots.ShootIntervalJitter
+	bot.nextShotAt = now
+		+ (GameConfig.Bots.ShootInterval + rng:NextNumber(-jitter, jitter)) * bot.difficulty.fireRateMult
+
+	local weaponId = GameConfig.Bots.BotWeapon
+	local spec = (GameConfig.Combat.Guns :: any)[weaponId]
 	local origin = bot.root.Position + Vector3.new(0, 1.5, 0)
-	local direction = (target.Position - origin).Unit
+	local aim = (target.Position - origin).Unit
+
+	-- Roll a real cone and raycast for real. The old code aimed perfectly every time and
+	-- decided hits with a coin flip on DAMAGE, so the tracer always pointed dead centre and
+	-- a miss was invisible — firefights looked broken.
+	local spreadDeg = GameConfig.Bots.ShootSpreadDeg * bot.difficulty.spreadMult
+	local offset = Ballistics.coneOffset(spreadDeg, rng:NextNumber(), rng:NextNumber())
+	local up = if Ballistics.safeUpAxis(aim.Y) == "Z" then Vector3.zAxis else Vector3.yAxis
+	local direction = (CFrame.lookAt(Vector3.zero, aim, up) * CFrame.Angles(
+		math.rad(offset.pitchDeg),
+		math.rad(offset.yawDeg),
+		0
+	)).LookVector
+
+	-- Broadcast the ACTUAL direction so a miss is visibly a miss.
 	self._deps.remotes.fireAllClients("ShotFired", {
 		shooterUserId = -bot.id, -- negative id marks a bot shooter (no real player)
 		origin = origin,
 		direction = direction,
-		weaponId = "AssaultRifle",
+		weaponId = weaponId,
 	})
-	-- Accuracy roll: some shots visibly miss.
-	if rng:NextNumber(0, 1) <= GameConfig.Bots.ShootAccuracy then
-		local victim = self:_botFromCharacter(target.Parent :: Instance)
-		if victim and victim.role == "ZOMBIE" then
-			victim.humanoid:TakeDamage(GameConfig.Combat.Guns.AssaultRifle.Damage)
+
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { bot.model }
+	local result = workspace:Raycast(origin, direction * spec.Range, params)
+	if result == nil then
+		return
+	end
+	local hitModel = result.Instance:FindFirstAncestorOfClass("Model")
+	if hitModel == nil then
+		return
+	end
+
+	-- Bot bullets hurt zombie bots AND human zombies. Previously they could only damage
+	-- zombie bots, so bots were cosmetic in any fight involving a real player.
+	local victim = self:_botFromCharacter(hitModel)
+	if victim then
+		if victim.role == "ZOMBIE" then
+			self:_reactToDamage(victim)
+			victim.humanoid:TakeDamage(spec.Damage)
 		end
+		return
+	end
+	if self._deps.damageInfectedPlayer then
+		self._deps.damageInfectedPlayer(hitModel, spec.Damage)
+	end
+end
+
+-- A bot that gets shot flinches and turns toward the source. Nothing in the old file
+-- reacted to taking damage at all.
+function BotService:_reactToDamage(bot: Bot, source: Vector3?)
+	bot.justDamaged = true
+	if source then
+		bot.lastKnown = source
+		bot.lastContact = os.clock()
 	end
 end
 
@@ -740,106 +971,227 @@ function BotService:_stepBot(bot: Bot, now: number, targets: { Target }, threats
 		return
 	end
 	local pos = bot.root.Position
+	local infected = bot.role ~= "SURVIVOR"
 
-	if bot.role == "SURVIVOR" then
-		self:_survivorGunfire(bot, now, threats)
-
-		-- Flee the nearest visible threat if it's close.
-		local threat: BasePart? = nil
-		local threatDist = GameConfig.Bots.FleeRadius
-		for _, threatRoot in threats do
-			local d = (threatRoot.Position - pos).Magnitude
-			if d < threatDist and self:_lineOfSight(bot, threatRoot.Position) then
-				threat, threatDist = threatRoot, d
-			end
-		end
-		if threat then
-			local away = (pos - (threat :: BasePart).Position)
-			away = Vector3.new(away.X, 0, away.Z)
-			local flee = pos + (away.Magnitude > 0.1 and away.Unit or Vector3.new(1, 0, 0)) * 30
-			self:_navigateTo(
-				bot,
-				flee,
-				now,
-				bot.baseSpeed * GameConfig.Movement.SprintWalkSpeed / GameConfig.Movement.BaseWalkSpeed
-			)
-			return
-		end
-
-		-- Otherwise behave by personality.
-		local reached = bot.wanderTarget == nil or (bot.wanderTarget - pos).Magnitude < 8
-		if bot.personality == "grouper" then
-			-- Drift toward the centroid of nearby survivors.
-			local sum, count = Vector3.zero, 0
-			for _, t in targets do
-				if t.root ~= bot.root and (t.pos - pos).Magnitude < GameConfig.Bots.GroupRadius then
-					sum += t.pos
-					count += 1
-				end
-			end
-			if count > 0 then
-				bot.wanderTarget = sum / count
-			elseif reached then
-				local spawn = self._deps.getSurvivorSpawn()
-				bot.wanderTarget = spawn and spawn.Position
-					or (pos + Vector3.new(rng:NextNumber(-24, 24), 0, rng:NextNumber(-24, 24)))
-			end
-		elseif reached then
-			local spawn = self._deps.getSurvivorSpawn()
-			local spread = bot.personality == "cautious" and 16 or 34
-			bot.wanderTarget = spawn and spawn.Position
-				or (pos + Vector3.new(rng:NextNumber(-spread, spread), 0, rng:NextNumber(-spread, spread)))
-		end
-		self:_navigateTo(bot, bot.wanderTarget or pos, now, bot.baseSpeed)
-	else
-		-- Infected: chase (PZ stalks the most isolated survivor) and convert on contact.
+	-- Perception snapshot -> state machine. The old code was a straight-line if/else with
+	-- no memory and no hysteresis, so bots flipped state every tick at the flee boundary
+	-- and forgot a target the instant line of sight broke.
+	local threatPos, threatDist, threatVisible
+	if infected then
 		local target: Target? = if bot.role == "PATIENT_ZERO" then self:_isolatedTarget(targets) else nil
 		if target == nil then
 			local bestDist = math.huge
 			for _, t in targets do
 				local d = (t.pos - pos).Magnitude
-				if d < bestDist then
+				-- Infected now need to actually perceive a survivor to chase them. The chase
+				-- branch never checked line of sight before, giving zombie bots wallhacks.
+				if d < bestDist and self:_canSee(bot, t.pos) then
 					target, bestDist = t, d
 				end
 			end
 		end
 		if target then
-			local chaseSpeed = GameConfig.Movement.BaseWalkSpeed
-				* (if bot.role == "PATIENT_ZERO" then GameConfig.Combat.PatientZero.SprintMult else 1)
-				* bot.difficulty.speedMult
-			self:_navigateTo(bot, (target :: Target).pos, now, chaseSpeed)
-			local range = GameConfig.Combat.Zombie.MeleeRange
-			local reactionGate = 1 * bot.difficulty.reactionMult
-			if ((target :: Target).pos - pos).Magnitude <= range and now - bot.lastAction > reactionGate then
-				bot.lastAction = now
-				local t = target :: Target
-				if t.player then
-					self._deps.convertHuman(t.player)
-				else
-					self:convertBot(t.model, nil)
-				end
+			threatPos = (target :: Target).pos
+			threatDist = (threatPos - pos).Magnitude
+			threatVisible = self:_canSee(bot, threatPos)
+			if threatVisible then
+				bot.lastKnown = threatPos
+				bot.lastContact = now
 			end
 		end
+		if threatPos == nil and bot.lastKnown then
+			if not BotVision.memoryExpired(now - bot.lastContact, GameConfig.Bots.MemorySeconds) then
+				threatPos = bot.lastKnown
+				threatDist = (bot.lastKnown - pos).Magnitude
+				threatVisible = false
+			else
+				bot.lastKnown = nil
+			end
+		end
+	else
+		threatPos, threatDist, threatVisible = self:_perceiveThreat(bot, now, threats)
+	end
+
+	local allyCount = 0
+	for _, t in targets do
+		if t.root ~= bot.root and (t.pos - pos).Magnitude < GameConfig.Bots.GroupRadius then
+			allyCount += 1
+		end
+	end
+
+	local state = BotBrain.next(bot.brain, bot.role, {
+		threatDist = threatDist,
+		threatVisible = threatVisible,
+		hasLastKnown = bot.lastKnown ~= nil,
+		timeSinceContact = now - bot.lastContact,
+		health01 = bot.humanoid.Health / math.max(1, bot.humanoid.MaxHealth),
+		allyCount = allyCount,
+		justDamaged = bot.justDamaged,
+	}, bot.brainConfig, now)
+	bot.justDamaged = false
+
+	local sprint = GameConfig.Movement.SprintWalkSpeed
+	local walk = GameConfig.Movement.BaseWalkSpeed
+
+	if state == "STAGGER" then
+		-- Flinch: stop moving and face where it came from. A bot that ignores being shot
+		-- is the clearest tell that it isn't a player.
+		bot.humanoid:Move(Vector3.zero)
+		if bot.lastKnown then
+			local look = bot.lastKnown - pos
+			if math.abs(look.X) + math.abs(look.Z) > 0.1 then
+				bot.root.CFrame = CFrame.lookAt(pos, Vector3.new(bot.lastKnown.X, pos.Y, bot.lastKnown.Z))
+			end
+		end
+		return
+	end
+
+	if state == "ENGAGE" then
+		self:_survivorGunfire(bot, now, threats)
+		-- Hold position and shoot rather than walking into the muzzle.
+		if threatPos then
+			bot.humanoid:Move(Vector3.zero)
+			bot.root.CFrame = CFrame.lookAt(pos, Vector3.new(threatPos.X, pos.Y, threatPos.Z))
+		end
+		return
+	end
+
+	if state == "FLEE" then
+		local from = threatPos or pos + Vector3.new(1, 0, 0)
+		local away = pos - from
+		away = Vector3.new(away.X, 0, away.Z)
+		local flee = pos + (away.Magnitude > 0.1 and away.Unit or Vector3.new(1, 0, 0)) * 30
+		self:_navigateTo(bot, flee, now, sprint)
+		-- Fire while backing off if there's still something to shoot at.
+		self:_survivorGunfire(bot, now, threats)
+		return
+	end
+
+	if state == "SEARCH" then
+		-- Sweep around where the target was last seen, fanning out as the trail cools.
+		if bot.searchTarget == nil or (bot.searchTarget - pos).Magnitude < 6 then
+			local anchor = bot.lastKnown or pos
+			local radius = BotVision.searchRadius(
+				now - bot.lastContact,
+				GameConfig.Bots.SearchRadiusBase,
+				GameConfig.Bots.SearchRadiusGrowth
+			)
+			bot.searchTarget = anchor
+				+ Vector3.new(rng:NextNumber(-radius, radius), 0, rng:NextNumber(-radius, radius))
+		end
+		self:_navigateTo(bot, bot.searchTarget or pos, now, walk * 1.1)
+		if not infected then
+			self:_survivorGunfire(bot, now, threats)
+		end
+		return
+	end
+	bot.searchTarget = nil
+
+	if state == "REGROUP" then
+		local sum, count = Vector3.zero, 0
+		for _, t in targets do
+			if t.root ~= bot.root then
+				sum += t.pos
+				count += 1
+			end
+		end
+		local goal = if count > 0 then sum / count else pos
+		self:_navigateTo(bot, goal, now, walk)
+		self:_survivorGunfire(bot, now, threats)
+		return
+	end
+
+	if state == "HUNT" or state == "STALK" then
+		local chaseSpeed = walk
+			* (if bot.role == "PATIENT_ZERO" then GameConfig.Combat.PatientZero.SprintMult else 1)
+			* bot.difficulty.speedMult
+		-- Stalking hangs back at a walk; committing to the kill is a sprint.
+		if state == "STALK" then
+			chaseSpeed *= 0.85
+		end
+		local goal = threatPos or bot.lastKnown
+		if goal == nil then
+			-- Nothing perceived: patrol so the horde keeps pressure on rather than idling.
+			if bot.wanderTarget == nil or (bot.wanderTarget - pos).Magnitude < 8 then
+				local spawn = self._deps.getSurvivorSpawn()
+				bot.wanderTarget = spawn and spawn.Position
+					or (pos + Vector3.new(rng:NextNumber(-30, 30), 0, rng:NextNumber(-30, 30)))
+			end
+			self:_navigateTo(bot, bot.wanderTarget or pos, now, chaseSpeed)
+			return
+		end
+		self:_navigateTo(bot, goal, now, chaseSpeed)
+
+		local range = GameConfig.Combat.Zombie.MeleeRange
+		if threatDist and threatDist <= range then
+			-- Telegraphed attack: wind up, then convert. Previously a single touch converted
+			-- instantly with no animation and no chance to react.
+			if bot.windupUntil == nil then
+				if now - bot.lastAction > 1 * bot.difficulty.reactionMult then
+					bot.windupUntil = now + GameConfig.Bots.MeleeWindup
+					bot.humanoid:Move(Vector3.zero)
+				end
+			elseif now >= (bot.windupUntil :: number) then
+				bot.windupUntil = nil
+				bot.lastAction = now
+				-- Re-check range at the end of the wind-up so the swing can be dodged.
+				local victim: Target? = nil
+				for _, t in targets do
+					if (t.pos - bot.root.Position).Magnitude <= range then
+						victim = t
+						break
+					end
+				end
+				if victim then
+					local v = victim :: Target
+					if v.player then
+						self._deps.convertHuman(v.player)
+					else
+						self:convertBot(v.model, nil)
+					end
+				end
+			end
+			return
+		end
+		bot.windupUntil = nil
+		return
+	end
+
+	-- PATROL: wander toward map patrol points, spread by personality.
+	local reached = bot.wanderTarget == nil or (bot.wanderTarget - pos).Magnitude < 8
+	if reached then
+		local point = self._deps.getPatrolPoint and self._deps.getPatrolPoint()
+		local spread = bot.personality == "cautious" and 16 or 34
+		bot.wanderTarget = point
+			or (pos + Vector3.new(rng:NextNumber(-spread, spread), 0, rng:NextNumber(-spread, spread)))
+	end
+	self:_navigateTo(bot, bot.wanderTarget or pos, now, walk)
+	if not infected then
+		self:_survivorGunfire(bot, now, threats)
 	end
 end
 
 function BotService:start()
-	local accumulator = 0
-	RunService.Heartbeat:Connect(function(dt)
-		accumulator += dt
-		if accumulator < GameConfig.Bots.ThinkInterval then
-			return
-		end
-		accumulator = 0
+	RunService.Heartbeat:Connect(function()
 		if not self._active then
 			return
 		end
 		local now = os.clock()
 		-- Snapshot the shared world state once per tick (not once per bot per check).
-		local targets = self:_survivorTargets()
-		local threats = self:_visibleThreats()
+		local targets: { Target }? = nil
+		local threats: { BasePart }? = nil
 		for _, bot in self._bots do
-			self:_stepBot(bot, now, targets, threats)
+			-- Each bot thinks on its own offset within the interval. Previously every bot
+			-- decided on the same frame, which spiked frame time and made a squad of bots
+			-- turn in perfect unison.
+			if now >= bot.nextThink then
+				bot.nextThink = now + GameConfig.Bots.ThinkInterval
+				if targets == nil then
+					targets = self:_survivorTargets()
+					threats = self:_visibleThreats()
+				end
+				self:_stepBot(bot, now, targets :: { Target }, threats :: { BasePart })
+			end
 		end
 	end)
 end
