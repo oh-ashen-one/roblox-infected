@@ -213,6 +213,12 @@ local GameConfig = {
 		-- ends - which is exactly what the combat simulation caught.
 		HuntSpeedMult = 1.55,
 
+		-- Idle emotes. Bots that occasionally stop to wave or dance read as people rather
+		-- than as pathfinding demos, and it costs nothing — the animations are first-party.
+		EmoteChance = 0.05, -- per think tick, while patrolling with nothing to do
+		EmoteCooldown = 14, -- seconds between a bot's emotes
+		EmoteMaxHold = 2.2, -- max seconds a bot stands still for one; longer is a free kill
+
 		-- Difficulty tiers rolled per-bot at spawn. These now scale aim, rate of fire and
 		-- perception too — previously only chase speed and one delay differed, so a Rookie
 		-- and a Veteran shot identically.

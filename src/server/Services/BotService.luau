@@ -27,6 +27,7 @@ local GameConfig = require(Shared.GameConfig)
 local Ballistics = require(Shared.Ballistics)
 local BotBrain = require(Shared.BotBrain)
 local BotVision = require(Shared.BotVision)
+local Emotes = require(Shared.Emotes)
 
 local Rig = require(script.Parent.Parent.Bots.Rig)
 
@@ -98,6 +99,8 @@ type Bot = {
 	searchTarget: Vector3?,
 	windupUntil: number?,
 	cleanupAnim: (() -> ())?,
+	emoteUntil: number?,
+	nextEmoteAt: number,
 }
 
 -- Roblox-looking display names. The old list was 20 entries all suffixed " [bot]", which
@@ -374,6 +377,9 @@ function BotService:spawnForRound(count: number, opts: { botIsPZ: boolean })
 			searchTarget = nil,
 			windupUntil = nil,
 			cleanupAnim = cleanupAnim,
+			emoteUntil = nil,
+			-- Stagger the first opportunity so a fresh lobby doesn't all wave at once.
+			nextEmoteAt = os.clock() + rng:NextNumber(3, GameConfig.Bots.EmoteCooldown),
 		}
 		bot.brainConfig = BotBrain.configFor(bot.personality, {
 			engageRange = GameConfig.Bots.ShootRange * bot.difficulty.sightMult,
@@ -972,6 +978,61 @@ function BotService:_isolatedTarget(targets: { Target }): Target?
 	return best
 end
 
+-- Idle emote. Bots stop and wave/dance now and then while patrolling, which is most of what
+-- separates "a person standing around" from "an NPC waiting for a path".
+--
+-- PATIENT ZERO GUARD: uses exactly the same rule players do (Emotes.canPlay), so a bot
+-- Patient Zero emotes just like a survivor bot. If only true survivors emoted, the one bot
+-- that never waved would be the infected one — the absence would be the tell.
+function BotService:_maybeEmote(bot: Bot, now: number): boolean
+	if bot.emoteUntil and now < bot.emoteUntil then
+		-- Mid-emote: hold still so the animation reads.
+		bot.humanoid:Move(Vector3.zero)
+		return true
+	end
+	bot.emoteUntil = nil
+
+	if not Emotes.canPlay(bot.role) then
+		return false
+	end
+	if now < bot.nextEmoteAt or rng:NextNumber() > GameConfig.Bots.EmoteChance then
+		return false
+	end
+
+	local animator = bot.humanoid:FindFirstChildOfClass("Animator")
+	if animator == nil then
+		return false
+	end
+	local emote = Emotes.Catalog[rng:NextInteger(1, #Emotes.Catalog)]
+	local animation = Instance.new("Animation")
+	animation.AnimationId = "rbxassetid://" .. emote.animationId
+	local ok, track = pcall(function()
+		return (animator :: Animator):LoadAnimation(animation)
+	end)
+	if not ok or track == nil then
+		return false
+	end
+	local loaded = track :: AnimationTrack
+	loaded.Priority = Enum.AnimationPriority.Action
+	loaded.Looped = false
+	loaded:Play(0.15)
+
+	-- Hold still only briefly, even for a long dance: a bot frozen for four seconds is a
+	-- free kill, and the flavour lands in the first beat anyway. The track is cut short
+	-- rather than the emote list being restricted to short ones.
+	local hold = math.min(emote.duration, GameConfig.Bots.EmoteMaxHold)
+	bot.emoteUntil = now + hold
+	bot.nextEmoteAt = now + GameConfig.Bots.EmoteCooldown + rng:NextNumber(0, 10)
+	bot.humanoid:Move(Vector3.zero)
+	task.delay(hold, function()
+		pcall(function()
+			loaded:Stop(0.2)
+			loaded:Destroy()
+		end)
+	end)
+	return true
+end
+
 -- `targets` (alive survivors) and `threats` (visible infected) are computed ONCE per tick
 -- in start() and shared across all bots, instead of each bot rebuilding them several times.
 function BotService:_stepBot(bot: Bot, now: number, targets: { Target }, threats: { BasePart })
@@ -1057,6 +1118,10 @@ function BotService:_stepBot(bot: Bot, now: number, targets: { Target }, threats
 
 	local sprint = GameConfig.Movement.SprintWalkSpeed
 	local walk = GameConfig.Movement.BaseWalkSpeed
+
+	if state ~= "PATROL" and bot.emoteUntil then
+		bot.emoteUntil = nil
+	end
 
 	if state == "STAGGER" then
 		-- Flinch: stop moving and face where it came from. A bot that ignores being shot
@@ -1191,6 +1256,9 @@ function BotService:_stepBot(bot: Bot, now: number, targets: { Target }, threats
 	end
 
 	-- PATROL: wander toward map patrol points, spread by personality.
+	if self:_maybeEmote(bot, now) then
+		return
+	end
 	local reached = bot.wanderTarget == nil or (bot.wanderTarget - pos).Magnitude < 8
 	if reached then
 		local point = self._deps.getPatrolPoint and self._deps.getPatrolPoint()

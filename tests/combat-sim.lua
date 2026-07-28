@@ -97,6 +97,7 @@ print(("[SIM] spawned=%d hunters=%d horizon=%ds"):format(#ids, hunters, SIM_SECO
 -- Observe.
 local startSurvivors = service:survivorCount()
 local moved, animated = 0, 0
+local emoted = 0
 local startPositions = {}
 for id, bot in service._bots do
 	startPositions[id] = bot.root.Position
@@ -111,6 +112,11 @@ while os.clock() < deadline do
 	for _, bot in service._bots do
 		if bot.brain and bot.brain.state then
 			statesSeen[bot.brain.state] = (statesSeen[bot.brain.state] or 0) + 1
+		end
+	end
+	for _, bot in service._bots do
+		if bot.emoteUntil then
+			emoted += 1
 		end
 	end
 	local remaining = service:survivorCount()
@@ -137,6 +143,7 @@ end
 local endSurvivors = service:survivorCount()
 print(("[SIM] survivors %d -> %d (converted %d)"):format(startSurvivors, endSurvivors, conversions))
 print(("[SIM] bots that moved: %d/%d, animating: %d/%d"):format(moved, #ids, animated, #ids))
+print(("[SIM] idle-emote ticks observed: %d"):format(emoted))
 local stateList = {}
 for state, n in statesSeen do
 	table.insert(stateList, ("%s=%d"):format(state, n))
