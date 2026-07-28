@@ -118,6 +118,25 @@ OWNER account `solashenone` (not `solashenone1`), `rojo serve` + connect the Roj
 keeps working; it just doesn't have these upgrades yet. Recommended: playtest first
 (Test → Clients/Servers) to feel the juice + watch the bots path around the map.
 
+## Known limitation: bot vertical navigation
+
+Measured on the live engine (the `[VS]` harness pattern in this repo's test scripts): bots
+climb, but not all the way. From a ground spawn over 40s they gain ~17 studs on Suburbia
+(they do get onto house roofs via the exterior stairs) and ~7 studs on Mall and Facility —
+partway up an escalator or the reactor stairs, then they stall. The church tower (43 studs)
+and the Mall's upper gallery were not reached.
+
+Two things were tried and did NOT fix it: `AgentCanClimb = true` on the path agent (worth
+1 stud), and targeting via raw `PathfindingService` instead of the service's own navigation.
+TrussPart ladders appear to be effectively invisible to Roblox navigation, and
+`PathStatus.Success` can mean "routed to a point underneath the target", which makes naive
+pathfinding checks read as passing when they aren't.
+
+Mitigated rather than solved: every elevated area has stepped stairs as its primary route
+(ladders are a player shortcut only), and zombie spawns exist on the upper levels of all
+three maps, so a survivor holding high ground is always answerable. Worth a hands-on look —
+if roof camping turns out to be strong in a real round, this is the cause.
+
 # Build status vs Definition of Done
 
 Updated 2026-07-17 (published PRIVATE to Roblox as "INFECTED - Hidden Zombie Among You"; latest build with all fixes + sounds is live on the cloud place).

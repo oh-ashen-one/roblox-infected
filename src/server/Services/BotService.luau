@@ -775,6 +775,9 @@ function BotService:_computePath(bot: Bot, goal: Vector3)
 			AgentRadius = GameConfig.Bots.AgentRadius,
 			AgentHeight = GameConfig.Bots.AgentHeight,
 			AgentCanJump = true,
+			-- Opt into ladders. Without this the navmesh ignores TrussParts entirely, so
+			-- every ladder-only route on a map is invisible to a bot.
+			AgentCanClimb = true,
 		})
 		local ok = pcall(function()
 			path:ComputeAsync(bot.root.Position, goal)
