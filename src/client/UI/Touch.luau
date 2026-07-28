@@ -45,12 +45,21 @@ function Touch.start(
 	local reload = makeButton("RELOAD", UDim2.new(1, -100, 1, -290))
 	local sprint = makeButton("SPRINT", UDim2.new(0, 24, 1, -160))
 
-	fire.MouseButton1Click:Connect(function()
+	-- Held-trigger parity with mouse and keyboard: tapping used to be the only way to fire,
+	-- which made automatic weapons unusable on a phone.
+	fire.MouseButton1Down:Connect(function()
 		if role == "ZOMBIE" then
 			actions.melee()
 		else
-			actions.fire()
+			actions.setFiring(true)
 		end
+	end)
+	fire.MouseButton1Up:Connect(function()
+		actions.setFiring(false)
+	end)
+	-- A drag that leaves the button still counts as letting go of the trigger.
+	fire.MouseLeave:Connect(function()
+		actions.setFiring(false)
 	end)
 	throwBtn.MouseButton1Click:Connect(function()
 		if role == "PATIENT_ZERO" then

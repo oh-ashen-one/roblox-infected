@@ -23,7 +23,9 @@ local Specs: { [string]: Spec } = {
 			direction = v.unitVector3(),
 			weaponId = v.oneOf({ "AssaultRifle", "Shotgun", "SMG", "Pistol", "Minigun" }),
 		}),
-		ratePerSecond = 30, -- above any legit fire rate; CombatService enforces per-weapon cooldowns
+		-- Above any legit fire rate; CombatService enforces per-weapon cooldowns. Held-trigger
+		-- fire means the Minigun genuinely sends 25/s, so the flood guard needs headroom.
+		ratePerSecond = 40,
 	},
 	ThrowKnife = {
 		validator = v.shape({ origin = v.vector3(4096), direction = v.unitVector3() }),
@@ -62,7 +64,10 @@ local Specs: { [string]: Spec } = {
 		ratePerSecond = 8,
 	},
 
+	PlayEmote = { validator = v.shape({ emoteId = v.str(32) }), ratePerSecond = 2 },
+
 	-- Server -> Client (no validator/rate limit; server is trusted)
+	EmotePlayed = {},
 	RoundState = {},
 	RoleAssigned = {},
 	KillFeed = {},

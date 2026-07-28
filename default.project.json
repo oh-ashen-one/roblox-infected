@@ -19,6 +19,13 @@
     },
 
     "StarterPlayer": {
+      "$properties": {
+        "EnableMouseLockOption": false,
+        "CameraMinZoomDistance": 7,
+        "CameraMaxZoomDistance": 13,
+        "CameraMode": "Classic",
+        "DevComputerMovementMode": "KeyboardMouse"
+      },
       "StarterPlayerScripts": {
         "Client": {
           "$path": "src/client"

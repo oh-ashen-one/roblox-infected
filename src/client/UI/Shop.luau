@@ -13,6 +13,7 @@ local Titles = require(Shared.Titles)
 local Keybinds = require(Shared.Keybinds)
 
 local Theme = require(script.Parent.Theme)
+local MenuState = require(script.Parent.MenuState)
 
 local Shop = {}
 
@@ -52,6 +53,8 @@ function Shop.start(remotes: any)
 		BackgroundTransparency = 0.05,
 		Visible = false,
 	})
+	-- Releases the locked mouse while this panel is open.
+	MenuState.track(panel)
 	Theme.corner(panel, 14)
 	Theme.gradient(panel, Theme.Colors.PanelLight, Theme.Colors.Panel, 90)
 	Theme.stroke(panel, Color3.fromRGB(60, 64, 78), 1, 0.3)

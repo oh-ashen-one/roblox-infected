@@ -11,11 +11,13 @@ local Lighting = game:GetService("Lighting")
 local Mall = require(script.Parent.Parent.Maps.Mall)
 local Suburbia = require(script.Parent.Parent.Maps.Suburbia)
 local Facility = require(script.Parent.Parent.Maps.Facility)
-local Warehouse = require(script.Parent.Parent.Maps.Warehouse)
-local Metro = require(script.Parent.Parent.Maps.Metro)
-
-local MAPS = { Mall, Suburbia, Facility, Warehouse, Metro }
-local VOTE_CANDIDATES = 3 -- how many random maps are offered each vote (keeps the 3-button UI)
+-- Three maps, not five. Warehouse (57 parts, flat by its own admission) and Metro (39
+-- parts, two studs of height variation in the whole level) were placeholders shipped as
+-- finished content; the effort went into making these three worth replaying instead.
+local MAPS = { Mall, Suburbia, Facility }
+-- Equal to #MAPS, so every map is always on the ballot: stable buttons, and players learn
+-- the rotation instead of being shown a random subset.
+local VOTE_CANDIDATES = 3
 
 local MapService = {}
 MapService.__index = MapService
@@ -125,12 +127,7 @@ function MapService:loadVotedMap(): Model
 	clone.Name = "ActiveMap"
 	clone.Parent = workspace
 
-	local lighting = MAPS[index].lighting
-	Lighting.Ambient = lighting.Ambient
-	Lighting.OutdoorAmbient = lighting.OutdoorAmbient
-	Lighting.ClockTime = lighting.ClockTime
-	Lighting.FogEnd = lighting.FogEnd
-	Lighting.FogColor = lighting.FogColor
+	self:_applyLighting(MAPS[index].lighting)
 
 	self._active = clone
 	return clone
@@ -143,6 +140,79 @@ function MapService:unload()
 	end
 end
 
+-- One place that owns lighting, used by both the round load and the lobby load (the two
+-- used to carry duplicated copies of the same block).
+--
+-- Beyond Ambient/Fog, this drives Brightness and creates the Atmosphere / ColorCorrection /
+-- Bloom instances. None of those existed anywhere in the game before, which is a large part
+-- of why every map read as the same grey box regardless of its stated time of day.
+function MapService:_applyLighting(def: any)
+	Lighting.Ambient = def.Ambient
+	Lighting.OutdoorAmbient = def.OutdoorAmbient
+	Lighting.ClockTime = def.ClockTime
+	Lighting.FogEnd = def.FogEnd
+	Lighting.FogColor = def.FogColor
+	Lighting.FogStart = def.FogStart or 0
+	Lighting.Brightness = def.Brightness or 2
+	Lighting.ExposureCompensation = def.Exposure or 0
+
+	local function ensure(className: string, name: string): Instance
+		local existing = Lighting:FindFirstChild(name)
+		if existing and existing.ClassName == className then
+			return existing
+		end
+		if existing then
+			existing:Destroy()
+		end
+		local created = Instance.new(className)
+		created.Name = name
+		created.Parent = Lighting
+		return created
+	end
+
+	local atmosphereDef = def.atmosphere
+	local atmosphere = ensure("Atmosphere", "MapAtmosphere") :: Atmosphere
+	if atmosphereDef then
+		atmosphere.Density = atmosphereDef.Density or 0.3
+		atmosphere.Offset = atmosphereDef.Offset or 0
+		atmosphere.Haze = atmosphereDef.Haze or 1
+		atmosphere.Glare = atmosphereDef.Glare or 0
+		atmosphere.Color = atmosphereDef.Color or Color3.fromRGB(199, 199, 199)
+		atmosphere.Decay = atmosphereDef.Decay or Color3.fromRGB(106, 112, 125)
+	else
+		atmosphere.Density = 0.2
+		atmosphere.Haze = 0
+	end
+
+	-- Sky. A custom skybox would need six uploaded textures, but StarCount/SunAngularSize on
+	-- the stock sky are free and make a night map read as night rather than as a dark room.
+	local skyDef = def.sky
+	local sky = ensure("Sky", "MapSky") :: Sky
+	sky.StarCount = if skyDef then skyDef.StarCount or 3000 else 3000
+	sky.CelestialBodiesShown = if skyDef then skyDef.CelestialBodiesShown ~= false else true
+	sky.SunAngularSize = if skyDef then skyDef.SunAngularSize or 21 else 21
+	sky.MoonAngularSize = if skyDef then skyDef.MoonAngularSize or 11 else 11
+
+	local fx = def.postFx
+	local correction = ensure("ColorCorrectionEffect", "MapColorCorrection") :: ColorCorrectionEffect
+	local bloom = ensure("BloomEffect", "MapBloom") :: BloomEffect
+	if fx then
+		correction.Brightness = fx.Brightness or 0
+		correction.Contrast = fx.Contrast or 0
+		correction.Saturation = fx.Saturation or 0
+		correction.TintColor = fx.TintColor or Color3.fromRGB(255, 255, 255)
+		bloom.Intensity = fx.BloomIntensity or 0.4
+		bloom.Threshold = fx.BloomThreshold or 0.95
+		bloom.Size = fx.BloomSize or 24
+	else
+		correction.Brightness = 0
+		correction.Contrast = 0
+		correction.Saturation = 0
+		correction.TintColor = Color3.fromRGB(255, 255, 255)
+		bloom.Intensity = 0.3
+	end
+end
+
 -- A map is always present so players never stand on an empty baseplate. Used during
 -- intermission and at server start; a round replaces it via loadVotedMap().
 function MapService:loadLobby()
@@ -152,12 +222,7 @@ function MapService:loadLobby()
 	local clone = self._built[index]:Clone()
 	clone.Name = "ActiveMap"
 	clone.Parent = workspace
-	local lighting = MAPS[index].lighting
-	Lighting.Ambient = lighting.Ambient
-	Lighting.OutdoorAmbient = lighting.OutdoorAmbient
-	Lighting.ClockTime = lighting.ClockTime
-	Lighting.FogEnd = lighting.FogEnd
-	Lighting.FogColor = lighting.FogColor
+	self:_applyLighting(MAPS[index].lighting)
 	self._active = clone
 	return clone
 end
@@ -189,6 +254,25 @@ end
 
 -- Nearest zombie spawn to any survivor that is >=25 studs away and has no clear
 -- line of sight to a survivor; falls back to random.
+-- A wander destination for bots. Prefers map-authored PatrolPoints; falls back to spawn
+-- markers so this works on maps that predate them. Bots previously wandered between spawn
+-- markers only, which made them ping-pong and clump in the same few spots every round.
+function MapService:randomPatrolPoint(): Vector3?
+	local active = workspace:FindFirstChild("ActiveMap")
+	local folder = active and active:FindFirstChild("PatrolPoints")
+	if folder then
+		local points = folder:GetChildren()
+		if #points > 0 then
+			local pick = points[math.random(1, #points)]
+			if pick:IsA("BasePart") then
+				return pick.Position
+			end
+		end
+	end
+	local spawn = self:randomSurvivorSpawn()
+	return spawn and spawn.Position or nil
+end
+
 function MapService:zombieSpawnNearAction(survivorRoots: { BasePart }): CFrame?
 	local spawns = self:_spawnsIn("ZombieSpawns")
 	if #spawns == 0 then

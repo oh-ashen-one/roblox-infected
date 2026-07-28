@@ -50,9 +50,17 @@ if mapsFolder then
 		local zoCount = zo and #zo:GetChildren() or 0
 		if svCount == 0 or zoCount == 0 then
 			mapsOk = false
-			print(("[HEADLESS] MAP %s BAD: survivorSpawns=%d zombieSpawns=%d"):format(mapModel.Name, svCount, zoCount))
+			print(
+				("[HEADLESS] MAP %s BAD: survivorSpawns=%d zombieSpawns=%d"):format(
+					mapModel.Name,
+					svCount,
+					zoCount
+				)
+			)
 		else
-			print(("[HEADLESS] map %s: %d survivor / %d zombie spawns"):format(mapModel.Name, svCount, zoCount))
+			print(
+				("[HEADLESS] map %s: %d survivor / %d zombie spawns"):format(mapModel.Name, svCount, zoCount)
+			)
 		end
 	end
 else
@@ -60,5 +68,31 @@ else
 	print("[HEADLESS] Maps folder MISSING")
 end
 
-local pass = sawRemotes and sawMap and errorCount == 0 and mapsOk
+-- Load every client module. There is no LocalPlayer in a headless boot so we cannot run the
+-- client, but requiring each module still catches the failure that actually bites: a bad
+-- require path or a load-time error in code that otherwise ships completely unexercised.
+local StarterPlayer = game:GetService("StarterPlayer")
+local clientOk = true
+local clientRoot = StarterPlayer:FindFirstChild("StarterPlayerScripts")
+clientRoot = clientRoot and clientRoot:FindFirstChild("Client")
+if clientRoot then
+	local loaded = 0
+	for _, module in clientRoot:GetDescendants() do
+		if module:IsA("ModuleScript") then
+			local ok, err = pcall(require, module)
+			if ok then
+				loaded += 1
+			else
+				clientOk = false
+				print(("[HEADLESS] CLIENT MODULE FAILED %s: %s"):format(module:GetFullName(), tostring(err)))
+			end
+		end
+	end
+	print(("[HEADLESS] client modules loaded: %d"):format(loaded))
+else
+	clientOk = false
+	print("[HEADLESS] client folder MISSING")
+end
+
+local pass = sawRemotes and sawMap and errorCount == 0 and mapsOk and clientOk
 print("[HEADLESS] VERDICT:", pass and "PASS" or "FAIL")

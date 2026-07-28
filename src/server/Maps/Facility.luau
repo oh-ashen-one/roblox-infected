@@ -1,165 +1,303 @@
 --!strict
--- RESEARCH FACILITY — corridor grid with labs off each side, every room has two
--- doors, a central server room holdout with three entrances, glass observation
--- walls. Claustrophobic sightlines favor the knife. ~200 x 130 studs.
+-- RESEARCH FACILITY — a clinical interior on two levels.
+--
+-- The old file's own comment promised "flanking side halls connect the two corridors at
+-- both map ends (no single choke)" and then never built them, so the map was two parallel
+-- corridors with eight identical labs and one server room. The side halls exist now, plus:
+--   • a REACTOR hall with a catwalk mezzanine reached by ladder and stairs
+--   • crawl vents that break line of sight and are too low to shoot down
+--   • four lab layouts instead of eight copies of one
+--
+-- Tight sightlines favour the knife, so the vertical and crawl routes are what give
+-- survivors an answer.
 
 local Kit = require(script.Parent.Kit)
-local C = Kit.Colors
 
-local WALL_H = 11
-local W, D = 200, 130
+local C = Kit.Palettes.Facility
+
+local GROUND = 0
+local MEZZ = 18
+local WALL_H = 13
+local W, D = 260, 190
+
+-- Lab. `kind` varies the internal layout and which walls have doors.
+local function lab(
+	geo: Instance,
+	patrol: Instance,
+	x: number,
+	z: number,
+	w: number,
+	d: number,
+	kind: number,
+	label: string
+)
+	local wallProps = { Color = C.Panel, Material = Enum.Material.Metal }
+	local white = { Color = C.LabWhite, Material = Enum.Material.SmoothPlastic }
+
+	Kit.floor(geo, x, z, w, d, GROUND + 0.2, white)
+	Kit.floor(geo, x, z, w, d, GROUND + WALL_H, { Color = C.DarkFloor, Material = Enum.Material.Metal })
+
+	-- Every lab has at least two ways in; kind 2 has three.
+	Kit.wallXDoor(geo, x, z - d / 2, w, WALL_H, GROUND, 9, wallProps)
+	Kit.wallXDoor(geo, x, z + d / 2, w, WALL_H, GROUND, if kind == 2 then 9 else 0, wallProps)
+	Kit.wallZDoor(geo, x - w / 2, z, d, WALL_H, GROUND, 8, wallProps)
+	Kit.wallZ(geo, x + w / 2, z, d, WALL_H, GROUND, wallProps)
+
+	-- Observation glass onto the corridor: you can be seen, and see, without a clear shot.
+	Kit.window(geo, x + w / 2, z, d * 0.6, 7, GROUND + 3, false, { Color = C.Glass })
+
+	if kind == 1 then
+		Kit.box(geo, x, GROUND, z, w * 0.5, 4, 5, { Color = C.Metal, Material = Enum.Material.Metal })
+	elseif kind == 2 then
+		for _, ox in { -w / 4, w / 4 } do
+			Kit.box(
+				geo,
+				x + ox,
+				GROUND,
+				z,
+				6,
+				8,
+				d * 0.5,
+				{ Color = C.Metal, Material = Enum.Material.Metal }
+			)
+		end
+	elseif kind == 3 then
+		Kit.cylinder(geo, x, GROUND, z, 8, 10, { Color = C.Accent, Material = Enum.Material.Glass })
+		Kit.box(
+			geo,
+			x - w / 4,
+			GROUND,
+			z + d / 4,
+			8,
+			4,
+			5,
+			{ Color = C.Metal, Material = Enum.Material.Metal }
+		)
+	else
+		Kit.box(geo, x, GROUND, z - d / 4, w * 0.7, 4, 4, { Color = C.Metal, Material = Enum.Material.Metal })
+		Kit.box(geo, x, GROUND, z + d / 4, w * 0.7, 4, 4, { Color = C.Metal, Material = Enum.Material.Metal })
+	end
+
+	Kit.sign(geo, x, GROUND + WALL_H - 3, z - d / 2 - 0.9, label, Enum.NormalId.Front, C.Accent, 14)
+	Kit.neonStrip(geo, x, GROUND + WALL_H - 1, z, w * 0.7, 2, C.Light, 2)
+	Kit.patrolMarker(patrol, x, GROUND, z)
+end
+
+-- Crawl vent: a low connector you can move through but not fight through.
+local function vent(geo: Instance, patrol: Instance, x: number, z: number, length: number, alongX: boolean)
+	local metal = { Color = C.Metal, Material = Enum.Material.DiamondPlate }
+	local w = if alongX then length else 9
+	local d = if alongX then 9 else length
+	Kit.floor(geo, x, z, w, d, GROUND + 0.3, metal)
+	-- Ceiling at 5 studs: too low to stand, so it breaks every sightline through it.
+	Kit.floor(geo, x, z, w, d, GROUND + 5, metal)
+	if alongX then
+		Kit.wallX(geo, x, z - d / 2, w, 5, GROUND, metal)
+		Kit.wallX(geo, x, z + d / 2, w, 5, GROUND, metal)
+	else
+		Kit.wallZ(geo, x - w / 2, z, d, 5, GROUND, metal)
+		Kit.wallZ(geo, x + w / 2, z, d, 5, GROUND, metal)
+	end
+	Kit.patrolMarker(patrol, x, GROUND, z)
+end
+
+local function reactorHall(geo: Instance, patrol: Instance, zombieSpawns: Instance, x: number, z: number)
+	local metal = { Color = C.Metal, Material = Enum.Material.DiamondPlate }
+	local panel = { Color = C.Panel, Material = Enum.Material.Metal }
+	local hallW, hallD = 90, 80
+
+	Kit.floor(geo, x, z, hallW, hallD, GROUND + 0.2, {
+		Color = C.DarkFloor,
+		Material = Enum.Material.DiamondPlate,
+	})
+	Kit.wallXDoor(geo, x, z - hallD / 2, hallW, 34, GROUND, 12, panel)
+	Kit.wallXDoor(geo, x, z + hallD / 2, hallW, 34, GROUND, 12, panel)
+	Kit.wallZDoor(geo, x - hallW / 2, z, hallD, 34, GROUND, 12, panel)
+	Kit.wallZDoor(geo, x + hallW / 2, z, hallD, 34, GROUND, 12, panel)
+	Kit.floor(geo, x, z, hallW, hallD, GROUND + 34, panel)
+
+	-- The reactor core: a glowing cylinder that lights the room and blocks the centre.
+	Kit.cylinder(geo, x, GROUND, z, 22, 30, { Color = C.Accent, Material = Enum.Material.Neon })
+	Kit.neonStrip(geo, x, GROUND + 31, z, 24, 24, C.Accent, 6)
+
+	-- Mezzanine catwalk ringing the core, with two independent ways up.
+	for _, mz in { z - 28, z + 28 } do
+		Kit.catwalk(geo, x, mz, hallW - 12, 12, MEZZ, metal)
+	end
+	for _, mx in { x - 33, x + 33 } do
+		Kit.catwalk(geo, mx, z, 12, hallD - 12, MEZZ, metal)
+	end
+	Kit.stairs(geo, x - 33, z - 40, 10, GROUND, MEZZ, 18, "+Z", metal)
+	Kit.ladder(geo, x + 33, z + 34, GROUND, MEZZ, metal)
+
+	-- Hazard striping so the drop reads before you walk off it.
+	for _, hx in { x - 33, x + 33 } do
+		Kit.box(geo, hx, MEZZ, z, 12, 0.4, 4, { Color = C.Hazard, Material = Enum.Material.Neon })
+	end
+
+	Kit.sign(geo, x, GROUND + 20, z - hallD / 2 - 0.9, "REACTOR", Enum.NormalId.Front, C.Danger, 26)
+
+	Kit.patrolMarker(patrol, x - 33, MEZZ, z)
+	Kit.patrolMarker(patrol, x + 33, MEZZ, z)
+	Kit.patrolMarker(patrol, x, GROUND, z - 34)
+	Kit.spawnMarker(zombieSpawns, x, GROUND, z - 34)
+	Kit.spawnMarker(zombieSpawns, x, MEZZ, z + 28)
+end
 
 return {
 	name = "Research Facility",
 	build = function(): Model
-		local map, geo, survivorSpawns, zombieSpawns = Kit.newMap("Research Facility")
+		local map, geo, survivorSpawns, zombieSpawns, patrol = Kit.newMap("Research Facility")
 
-		local wallProps = { Color = C.LabWhite, Material = Enum.Material.SmoothPlastic }
-		local glassProps = { Color = C.Glass, Material = Enum.Material.Glass, Transparency = 0.45 }
+		local white = { Color = C.LabWhite, Material = Enum.Material.SmoothPlastic }
+		local panel = { Color = C.Panel, Material = Enum.Material.Metal }
+		local metal = { Color = C.Metal, Material = Enum.Material.DiamondPlate }
 
-		-- Slab + ceiling
-		Kit.floor(
-			geo,
-			0,
-			0,
-			W,
-			D,
-			0,
-			{ Color = Color3.fromRGB(200, 202, 205), Material = Enum.Material.Marble }
-		)
-		Kit.part(
-			geo,
-			Vector3.new(W, 1, D),
-			CFrame.new(0, WALL_H + 0.5, 0),
-			{ Color = C.Roof, Material = Enum.Material.Concrete }
-		)
+		Kit.floor(geo, 0, 0, W, D, GROUND, white)
+		Kit.floor(geo, 0, 0, W, D, GROUND + 34, panel)
 
-		-- Perimeter
-		Kit.wallXDoor(geo, 0, -D / 2, W, WALL_H, 0, 10, wallProps)
-		Kit.wallXDoor(geo, 0, D / 2, W, WALL_H, 0, 10, wallProps)
-		Kit.wallZ(geo, -W / 2, 0, D, WALL_H, 0, wallProps)
-		Kit.wallZ(geo, W / 2, 0, D, WALL_H, 0, wallProps)
+		Kit.wallX(geo, 0, -D / 2, W, 34, GROUND, panel)
+		Kit.wallX(geo, 0, D / 2, W, 34, GROUND, panel)
+		Kit.wallZ(geo, -W / 2, 0, D, 34, GROUND, panel)
+		Kit.wallZ(geo, W / 2, 0, D, 34, GROUND, panel)
 
-		-- Two long east-west corridors at z = -20 and z = +20 formed by lab blocks.
-		-- North lab row (z from -65 to -21), south lab row (21..65), center block between corridors.
+		-- Two main corridors running the length of the map...
+		for _, cz in { -34, 34 } do
+			Kit.floor(geo, 0, cz, W - 20, 16, GROUND + 0.25, {
+				Color = C.Concrete,
+				Material = Enum.Material.Concrete,
+			})
+			for i = -5, 5 do
+				Kit.neonStrip(geo, i * 22, GROUND + WALL_H, cz, 12, 5, C.Light, 2)
+			end
+		end
 
-		-- Lab rows: 4 labs each side, doors onto the corridor + connecting doors between labs
-		local labW = 44
+		-- ...and the flanking side halls that connect them. These are the ones the original
+		-- file's comment promised and never built, leaving a single choke through the middle.
+		for _, sx in { -W / 2 + 24, W / 2 - 24 } do
+			Kit.floor(geo, sx, 0, 16, 84, GROUND + 0.25, {
+				Color = C.Concrete,
+				Material = Enum.Material.Concrete,
+			})
+			Kit.neonStrip(geo, sx, GROUND + WALL_H, 0, 5, 40, C.Light, 2)
+			Kit.patrolMarker(patrol, sx, GROUND, 0)
+		end
+
+		-- Labs off the outer edge of each corridor, four layouts.
+		local kinds = { 1, 3, 2, 4, 4, 2, 3, 1 }
+		local labels = { "BIO-1", "BIO-2", "CHEM", "COLD", "ASSAY", "OPTICS", "GENOME", "STORES" }
 		for i = 0, 3 do
-			local x = -W / 2 + 12 + i * (labW + 4) + labW / 2
-			-- North row: from perimeter to corridor
-			Kit.wallXDoor(geo, x, -21, labW, WALL_H, 0, 7, wallProps) -- corridor door
-			if i < 3 then
-				Kit.wallZDoor(geo, x + labW / 2 + 2, -43, 44, WALL_H, 0, 6, wallProps) -- lab-to-lab door
-			end
-			-- South row
-			Kit.wallXDoor(geo, x, 21, labW, WALL_H, 0, 7, wallProps)
-			if i < 3 then
-				Kit.wallZDoor(geo, x + labW / 2 + 2, 43, 44, WALL_H, 0, 6, wallProps)
-			end
-			-- Lab benches (cover)
-			Kit.box(geo, x, 0, -43, 14, 3.5, 4, { Color = C.Metal, Material = Enum.Material.Metal })
-			Kit.box(geo, x, 0, 43, 14, 3.5, 4, { Color = C.Metal, Material = Enum.Material.Metal })
-			-- Zombie spawns in alternating labs
-			if i % 2 == 1 then
-				Kit.spawnMarker(zombieSpawns, x, 0, -50)
-				Kit.spawnMarker(zombieSpawns, x, 0, 50)
-			end
+			local x = -84 + i * 56
+			lab(geo, patrol, x, -D / 2 + 26, 48, 34, kinds[i + 1], labels[i + 1])
+			lab(geo, patrol, x, D / 2 - 26, 48, 34, kinds[i + 5], labels[i + 5])
 		end
 
-		-- Central server room between the corridors (-20..20): THE holdout.
-		-- Three entrances: west door, east door, north glass wall with door.
-		local srW, srD = 70, 34
-		Kit.wallZDoor(geo, -srW / 2, 0, srD, WALL_H, 0, 7, wallProps) -- west
-		Kit.wallZDoor(geo, srW / 2, 0, srD, WALL_H, 0, 7, wallProps) -- east
-		Kit.wallXDoor(geo, 0, -srD / 2 + 3, srW, WALL_H, 0, 8, glassProps) -- north (glass, watchable)
-		Kit.wallX(geo, 0, srD / 2 - 3, srW, WALL_H, 0, wallProps) -- south solid
-		-- Server racks: cover lanes inside
-		for _, x in { -22, -8, 8, 22 } do
-			Kit.box(
-				geo,
-				x,
-				0,
-				0,
-				4,
-				7,
-				16,
-				{ Color = Color3.fromRGB(30, 34, 40), Material = Enum.Material.Metal }
-			)
+		reactorHall(geo, patrol, zombieSpawns, 0, 0)
+
+		-- Crawl vents: low flanking routes between the corridors and the reactor.
+		vent(geo, patrol, -70, 0, 60, false)
+		vent(geo, patrol, 70, 0, 60, false)
+		vent(geo, patrol, 0, -60, 70, true)
+
+		-- Server room: a holdout with three ways in, off the north corridor.
+		local sx, sz = -95, 0
+		Kit.floor(geo, sx, sz, 46, 46, GROUND + 0.2, metal)
+		Kit.wallXDoor(geo, sx, sz - 23, 46, WALL_H, GROUND, 9, panel)
+		Kit.wallXDoor(geo, sx, sz + 23, 46, WALL_H, GROUND, 9, panel)
+		Kit.wallZDoor(geo, sx - 23, sz, 46, WALL_H, GROUND, 9, panel)
+		Kit.wallZ(geo, sx + 23, sz, 46, WALL_H, GROUND, panel)
+		Kit.floor(geo, sx, sz, 46, 46, GROUND + WALL_H, panel)
+		for _, rx in { sx - 12, sx, sx + 12 } do
+			Kit.box(geo, rx, GROUND, sz, 6, 10, 30, { Color = C.DarkFloor, Material = Enum.Material.Metal })
+			Kit.neonStrip(geo, rx, GROUND + 10.4, sz, 4, 26, C.Accent, 1.2)
 		end
+		Kit.sign(geo, sx, GROUND + WALL_H - 3, sz - 23.9, "SERVER", Enum.NormalId.Front, C.Accent, 16)
+		Kit.patrolMarker(patrol, sx, GROUND, sz)
 
-		-- Flanking side halls connect the two corridors at both map ends (no single choke)
-		-- (the perimeter doors already provide outer rotation)
-
-		-- Ceiling lights: cool white every 30 studs down both corridors
-		for _, z in { -20, 20 } do
-			for i = 0, 6 do
-				local x = -90 + i * 30
-				local fixture = Kit.box(
-					geo,
-					x,
-					WALL_H - 1.4,
-					z,
-					4,
-					0.4,
-					2,
-					{ Color = Color3.fromRGB(220, 235, 255), Material = Enum.Material.Neon }
-				)
-				Kit.pointLight(fixture, 1.1, 24, Color3.fromRGB(200, 220, 255))
-			end
+		-- Decontamination bay opposite, a second named holdout.
+		local dx = 95
+		Kit.floor(geo, dx, 0, 46, 46, GROUND + 0.2, white)
+		Kit.wallXDoor(geo, dx, -23, 46, WALL_H, GROUND, 9, panel)
+		Kit.wallXDoor(geo, dx, 23, 46, WALL_H, GROUND, 9, panel)
+		Kit.wallZDoor(geo, dx + 23, 0, 46, WALL_H, GROUND, 9, panel)
+		Kit.window(geo, dx - 23, 0, 30, 8, GROUND + 3, false, { Color = C.Glass })
+		Kit.floor(geo, dx, 0, 46, 46, GROUND + WALL_H, panel)
+		for _, oz in { -12, 12 } do
+			Kit.cylinder(geo, dx, GROUND, oz, 7, 11, { Color = C.Glass, Material = Enum.Material.Glass })
 		end
-		-- Red emergency light in the server room
-		local red =
-			Kit.box(geo, 0, WALL_H - 1.4, 0, 2, 0.4, 2, { Color = C.Accent, Material = Enum.Material.Neon })
-		Kit.pointLight(red, 1.4, 30, Color3.fromRGB(255, 80, 80))
+		Kit.sign(geo, dx, GROUND + WALL_H - 3, -23.9, "DECON", Enum.NormalId.Front, C.Hazard, 16)
+		Kit.patrolMarker(patrol, dx, GROUND, 0)
 
-		-- Survivor spawns: corridor ends, lab corners, server room approaches
 		local spots = {
-			{ -95, -20 },
-			{ -90, -24 },
-			{ 95, -20 },
-			{ 90, -24 },
-			{ -95, 20 },
-			{ -90, 24 },
-			{ 95, 20 },
-			{ 90, 24 },
-			{ -60, -20 },
-			{ -55, -16 },
-			{ 60, 20 },
-			{ 55, 16 },
-			{ -60, 20 },
-			{ 60, -20 },
-			{ 0, -24 },
-			{ 5, -20 },
-			{ 0, 24 },
-			{ -5, 20 },
-			{ -40, -55 },
-			{ -35, -50 },
-			{ 40, -55 },
-			{ 40, 55 },
-			{ -40, 55 },
-			{ 35, 50 },
-			{ -85, -55 },
-			{ 85, -55 },
-			{ -85, 55 },
-			{ 85, 55 },
-			{ 20, -50 },
-			{ -20, 50 },
+			{ -120, -60 },
+			{ -120, 60 },
+			{ -95, 0 },
+			{ -95, -34 },
+			{ -95, 34 },
+			{ -70, -70 },
+			{ -70, 70 },
+			{ -56, -34 },
+			{ -56, 34 },
+			{ -28, -70 },
+			{ -28, 70 },
+			{ -20, -34 },
+			{ -20, 34 },
+			{ 0, -60 },
+			{ 0, 60 },
+			{ 20, -34 },
+			{ 20, 34 },
+			{ 28, -70 },
+			{ 28, 70 },
+			{ 56, -34 },
+			{ 56, 34 },
+			{ 70, -70 },
+			{ 70, 70 },
+			{ 95, 0 },
+			{ 95, -34 },
+			{ 95, 34 },
+			{ 120, -60 },
+			{ 120, 60 },
+			{ -106, 0 },
+			{ 106, 0 },
 		}
 		for _, spot in spots do
-			Kit.spawnMarker(survivorSpawns, spot[1], 0, spot[2])
+			Kit.spawnMarker(survivorSpawns, spot[1], GROUND, spot[2])
 		end
-		-- Corridor-end zombie spawns
-		Kit.spawnMarker(zombieSpawns, -95, 0, 0)
-		Kit.spawnMarker(zombieSpawns, 95, 0, 0)
+
+		Kit.spawnMarker(zombieSpawns, -W / 2 + 24, GROUND, 0)
+		Kit.spawnMarker(zombieSpawns, W / 2 - 24, GROUND, 0)
+		Kit.spawnMarker(zombieSpawns, -120, GROUND, -34)
+		Kit.spawnMarker(zombieSpawns, 120, GROUND, 34)
+		Kit.spawnMarker(zombieSpawns, 0, GROUND, -60)
 
 		return map
 	end,
 	lighting = {
-		Ambient = Color3.fromRGB(52, 56, 64),
-		OutdoorAmbient = Color3.fromRGB(60, 64, 74),
+		-- Clinical cyan-white: the only map where you can see clearly, which is the trade
+		-- for how little cover it gives you.
+		Ambient = Color3.fromRGB(96, 104, 112),
+		OutdoorAmbient = Color3.fromRGB(110, 120, 130),
 		ClockTime = 12,
-		FogEnd = 500,
-		FogColor = Color3.fromRGB(30, 32, 38),
+		Brightness = 3,
+		Exposure = 0,
+		FogStart = 80,
+		FogEnd = 520,
+		FogColor = Color3.fromRGB(120, 134, 144),
+		sky = { StarCount = 0, SunAngularSize = 18 },
+		atmosphere = {
+			Density = 0.22,
+			Haze = 0.8,
+			Glare = 0.1,
+			Color = Color3.fromRGB(226, 240, 248),
+			Decay = Color3.fromRGB(120, 140, 155),
+		},
+		postFx = {
+			Contrast = 0.06,
+			Saturation = -0.12,
+			TintColor = Color3.fromRGB(232, 246, 255),
+			BloomIntensity = 0.5,
+			BloomThreshold = 0.94,
+			BloomSize = 20,
+		},
 	},
 }

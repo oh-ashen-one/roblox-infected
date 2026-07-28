@@ -10,6 +10,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Keybinds = require(ReplicatedStorage:WaitForChild("Shared").Keybinds)
 local Theme = require(script.Parent.Theme)
+local CameraController = require(script.Parent.Parent.Controllers.CameraController)
+local MenuState = require(script.Parent.MenuState)
 local Sounds = require(script.Parent.Sounds)
 
 local Settings = {}
@@ -31,6 +33,8 @@ function Settings.start()
 		BackgroundTransparency = 0.05,
 		Visible = false,
 	})
+	-- Releases the locked mouse while this panel is open.
+	MenuState.track(panel)
 	Theme.corner(panel, 14)
 	Theme.gradient(panel, Theme.Colors.PanelLight, Theme.Colors.Panel, 90)
 	Theme.stroke(panel, Color3.fromRGB(60, 64, 78), 1, 0.3)
@@ -107,10 +111,9 @@ function Settings.start()
 	local musicGroup, sfxGroup = Sounds.getGroups()
 
 	sliderRow(1, "FIELD OF VIEW", 0.5, function(fraction)
-		local camera = workspace.CurrentCamera
-		if camera then
-			camera.FieldOfView = 60 + fraction * 40 -- 60..100
-		end
+		-- Goes through CameraController, which is the only thing allowed to write
+		-- FieldOfView. Writing the camera directly here used to be undone the next frame.
+		CameraController.setBaseFov(60 + fraction * 40) -- 60..100
 	end)
 	sliderRow(2, "MUSIC VOLUME", musicGroup.Volume, function(fraction)
 		musicGroup.Volume = fraction
@@ -229,7 +232,7 @@ function Settings.start()
 		if listening == nil or gameProcessed then
 			return
 		end
-		if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode ~= Enum.KeyCode.Unknown then
+		if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode ~= Enum.KeyCode.None then
 			local action = listening
 			listening = nil
 			Keybinds.set(LocalPlayer, action, input.KeyCode.Name)

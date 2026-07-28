@@ -70,13 +70,13 @@ write, universe 10518289514) once, put it in `ROBLOX_API_KEY` or
 playtest first.
 
 - **Phase D — content:** + Pouncer zombie class with a player-activated **lunge** ability
-  (server-authoritative, anti-cheat-safe), **5 maps** (added Warehouse + Metro), and a
+  (server-authoritative, anti-cheat-safe), **3 maps** (Warehouse + Metro were cut), and a
   3-random-candidate vote that scales to any map count.
 - **Phase E — social:** + native **friend-invite** button (SocialService).
 - **Phase H — cosmetics:** + **kill-effect** slot (5 effects) obtainable via crates/equip.
 
 **Headless validation:** `run-in-roblox` boot check PASSES on the full integrated build —
-server boots, 0 script errors, and all 5 maps have valid survivor+zombie spawns
+server boots, 0 script errors, and all 3 maps have valid survivor+zombie spawns
 (`tests/studio-smoke.lua`).
 
 - **Phase A — ragdoll:** bot deaths fling a physics ragdoll corpse (cloned parts +
@@ -105,7 +105,9 @@ Final closures:
 The only remaining items are hard-blocked on things I cannot do autonomously:
 - **Publish to the live place** — needs a Roblox Open Cloud API key (verified none exists on
   this machine; only the owner can mint one) via `scripts/publish.sh`, or a Studio publish.
-- **Emotes** — require animation assets uploaded to the Roblox account; can't create/upload.
+- ~~**Emotes**~~ — DONE. This was wrong: Roblox's own emote animations are public. All 7
+  verified loading and playing on the live engine (tests/asset-probe2.lua); shipped as an
+  emote wheel. The hidden PZ can emote, which is a free bluff.
 - **Full party matchmaking** — reserved servers + live multiplayer testing (friend *invite*
   already ships).
 - Perf *numeric tuning* + ragdoll/effect *visual polish* — need a live playtest/profile.
@@ -115,6 +117,25 @@ OWNER account `solashenone` (not `solashenone1`), `rojo serve` + connect the Roj
 (or File → Publish) to overwrite place 78267419085369. The currently LIVE public game
 keeps working; it just doesn't have these upgrades yet. Recommended: playtest first
 (Test → Clients/Servers) to feel the juice + watch the bots path around the map.
+
+## Known limitation: bot vertical navigation
+
+Measured on the live engine (the `[VS]` harness pattern in this repo's test scripts): bots
+climb, but not all the way. From a ground spawn over 40s they gain ~17 studs on Suburbia
+(they do get onto house roofs via the exterior stairs) and ~7 studs on Mall and Facility —
+partway up an escalator or the reactor stairs, then they stall. The church tower (43 studs)
+and the Mall's upper gallery were not reached.
+
+Two things were tried and did NOT fix it: `AgentCanClimb = true` on the path agent (worth
+1 stud), and targeting via raw `PathfindingService` instead of the service's own navigation.
+TrussPart ladders appear to be effectively invisible to Roblox navigation, and
+`PathStatus.Success` can mean "routed to a point underneath the target", which makes naive
+pathfinding checks read as passing when they aren't.
+
+Mitigated rather than solved: every elevated area has stepped stairs as its primary route
+(ladders are a player shortcut only), and zombie spawns exist on the upper levels of all
+three maps, so a survivor holding high ground is always answerable. Worth a hands-on look —
+if roof camping turns out to be strong in a real round, this is the cause.
 
 # Build status vs Definition of Done
 

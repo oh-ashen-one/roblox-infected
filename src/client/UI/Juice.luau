@@ -12,17 +12,16 @@
 -- server protocol beyond the optional position/damage now carried on HitConfirm.
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 local HapticService = game:GetService("HapticService")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local GameConfig = require(Shared.GameConfig)
 local SkinCatalog = require(Shared.SkinCatalog)
 
 local Theme = require(script.Parent.Theme)
+local CameraController = require(script.Parent.Parent.Controllers.CameraController)
 
 local function killEffectColor(effectId: string?): Color3?
 	if effectId == nil then
@@ -53,22 +52,12 @@ local function goreOn(): boolean
 	return LocalPlayer:GetAttribute("GoreEnabled") ~= false
 end
 
-local BASE_FOV = 70
-
--- Camera shake --------------------------------------------------------------------
--- `trauma` in [0,1]; perceived shake is trauma^2 so small hits stay subtle and big
--- events (getting infected) really kick. It decays every frame.
-local trauma = 0
-local fovKick = 0
 local shakeSeed = Random.new()
 
-local function addTrauma(amount: number)
-	trauma = math.clamp(trauma + amount, 0, 1)
-end
-
-local function punchFov(amount: number)
-	fovKick = math.min(fovKick + amount, 12)
-end
+-- Camera shake and FOV punch live in CameraController now — it is the single writer, so the
+-- player's FOV slider is no longer stomped every frame. We just feed it events.
+local addTrauma = CameraController.addTrauma
+local punchFov = CameraController.addFovKick
 
 -- Muzzle flash --------------------------------------------------------------------
 local function muzzleFlash(origin: Vector3, direction: Vector3)
@@ -221,31 +210,6 @@ function Juice.start(remotes: any)
 		end)
 	end
 
-	-- Camera shake + FOV kick applied AFTER the default camera update each frame.
-	RunService:BindToRenderStep("JuiceCamera", Enum.RenderPriority.Camera.Value + 1, function(dt)
-		local camera = workspace.CurrentCamera
-		if camera == nil then
-			return
-		end
-		-- Accessibility: damp shake + FOV kick for motion-sensitive players.
-		local motionScale = LocalPlayer:GetAttribute("ReducedMotion") == true and 0.15 or 1
-		if trauma > 0 then
-			local shake = trauma * trauma
-			local maxAngle = math.rad(5) * shake * motionScale
-			local rx = shakeSeed:NextNumber(-1, 1) * maxAngle
-			local ry = shakeSeed:NextNumber(-1, 1) * maxAngle
-			local rz = shakeSeed:NextNumber(-1, 1) * maxAngle * 0.5
-			camera.CFrame = camera.CFrame * CFrame.Angles(rx, ry, rz)
-			trauma = math.max(0, trauma - dt * 1.6)
-		end
-		if fovKick > 0.01 then
-			camera.FieldOfView = BASE_FOV + fovKick * motionScale
-			fovKick = math.max(0, fovKick - dt * 40)
-		elseif math.abs(camera.FieldOfView - BASE_FOV) > 0.01 then
-			camera.FieldOfView = BASE_FOV
-		end
-	end)
-
 	local myRole = "NONE"
 	local myKillEffect: string? = nil
 
@@ -256,8 +220,11 @@ function Juice.start(remotes: any)
 	remotes.on("ShotFired", function(payload)
 		if payload.shooterUserId == LocalPlayer.UserId then
 			muzzleFlash(payload.origin, payload.direction)
-			addTrauma(0.12)
-			punchFov(2.5)
+			-- Held-trigger fire means these stack every shot. At the old 0.12 per shot
+			-- against a 1.6/s decay, trauma pinned at maximum for the whole burst and you
+			-- could not see what you were shooting at.
+			addTrauma(0.035)
+			punchFov(1.2)
 			haptic(0.35, 0.06)
 		end
 	end)

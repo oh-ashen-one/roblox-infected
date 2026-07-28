@@ -39,14 +39,11 @@ function Modifiers.start(remotes: any)
 		TextColor3 = Theme.Colors.TextDim,
 	})
 
-	-- Capture defaults once so Blackout can be reverted exactly.
-	local defaults = {
-		Ambient = Lighting.Ambient,
-		OutdoorAmbient = Lighting.OutdoorAmbient,
-		Brightness = Lighting.Brightness,
-		ClockTime = Lighting.ClockTime,
-		FogEnd = Lighting.FogEnd,
-	}
+	-- Snapshot of the lighting to restore when Blackout ends. Captured when Blackout STARTS,
+	-- not once at client start: the old version restored whatever lighting happened to be
+	-- loaded when you joined, so after one Blackout round (about one in seven) every
+	-- subsequent map was lit wrong until the next map load.
+	local defaults: { [string]: any }? = nil
 	local blackoutOn = false
 
 	local function setBlackout(on: boolean)
@@ -54,15 +51,30 @@ function Modifiers.start(remotes: any)
 			return
 		end
 		blackoutOn = on
+		if on then
+			defaults = {
+				Ambient = Lighting.Ambient,
+				OutdoorAmbient = Lighting.OutdoorAmbient,
+				Brightness = Lighting.Brightness,
+				ClockTime = Lighting.ClockTime,
+				FogEnd = Lighting.FogEnd,
+			}
+		end
 		local target = on
 				and {
 					Ambient = Color3.fromRGB(8, 8, 12),
 					OutdoorAmbient = Color3.fromRGB(12, 12, 18),
-					Brightness = 0.4,
+					-- Blackout used to drop to 0.4 brightness with 120-stud fog on maps that
+					-- were already near-black, which made the round unplayable rather than
+					-- tense. The zombie outlines now carry the readability.
+					Brightness = 0.8,
 					ClockTime = 0,
-					FogEnd = 120,
+					FogEnd = 200,
 				}
 			or defaults
+		if target == nil then
+			return
+		end
 		TweenService:Create(Lighting, TweenInfo.new(0.8), {
 			Ambient = target.Ambient,
 			OutdoorAmbient = target.OutdoorAmbient,

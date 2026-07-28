@@ -5,6 +5,8 @@ local Theme = require(script.Parent.Theme)
 
 local MapVote = {}
 
+-- Fallback labels shown for the instant before the server's payload arrives. These are the
+-- three maps in rotation; the server relabels the buttons from its own list either way.
 local MAP_NAMES = { "Abandoned Mall", "Suburbia", "Research Facility" }
 
 function MapVote.start(remotes: any)

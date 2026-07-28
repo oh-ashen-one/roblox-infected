@@ -104,7 +104,7 @@ To playtest with bots: open the built place in Studio → **Test → Clients and
 |------|---------------|
 | `src/shared` | `GameConfig` (every tunable) + pure, tested modules: `RoundMachine`, `Rewards`, `PatientZero`, `LevelMath`, `CrateRoll`, `Quests`, `SeasonPass`, `DailyReward`, `AntiCheatMath`, `LiveConfig`, `Keybinds`; validated/rate-limited `Remotes`; `SkinCatalog` + `Titles` |
 | `src/server/Services` | `Round`, `Role`, `Combat`, `Bot`, `AntiCheat`, `Map`, `Data`, `Economy`, `Monetization`, `Endgame`, `Retention`, `Leaderboard`, `Analytics`, `LiveConfig` |
-| `src/server/Maps` | Building `Kit` + 5 fully-coded maps (Mall, Suburbia, Facility, Warehouse, Metro) |
+| `src/server/Maps` | Building `Kit` + 3 fully-coded maps (Mall, Suburbia, Facility) |
 | `src/client/UI` | HUD, RoleCard, RevealScreen, Shop, MapVote, Juice (game feel), Daily, Quests, Season, Leaderboard, Modifiers, Ability, Social, Nametags, Tutorial, Settings, Sounds, Theme |
 | `tests/` | Lune unit suite + `studio-smoke.lua` headless boot check |
 | `scripts/publish.sh` | Headless publish to the live place via Roblox Open Cloud |
