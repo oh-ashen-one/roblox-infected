@@ -999,6 +999,23 @@ function BotService:_stepBot(bot: Bot, now: number, targets: { Target }, threats
 				bot.lastContact = now
 			end
 		end
+		-- Nothing in sight: fall back to the short-range flesh sense before giving up, so
+		-- the horde keeps closing instead of milling about. Marked not-visible, so the brain
+		-- treats it as a lead to follow rather than a target it can attack from range.
+		if threatPos == nil then
+			local nearest, nearestDist = nil, GameConfig.Bots.InfectedSenseRadius
+			for _, t in targets do
+				local d = (t.pos - pos).Magnitude
+				if d < nearestDist then
+					nearest, nearestDist = t, d
+				end
+			end
+			if nearest then
+				bot.lastKnown = (nearest :: Target).pos
+				bot.lastContact = now
+			end
+		end
+
 		if threatPos == nil and bot.lastKnown then
 			if not BotVision.memoryExpired(now - bot.lastContact, GameConfig.Bots.MemorySeconds) then
 				threatPos = bot.lastKnown
@@ -1102,12 +1119,16 @@ function BotService:_stepBot(bot: Bot, now: number, targets: { Target }, threats
 	end
 
 	if state == "HUNT" or state == "STALK" then
+		-- A committed zombie has to outrun a sprinting survivor. At plain walk speed the
+		-- horde simply trails the pack forever and nobody is ever caught.
 		local chaseSpeed = walk
 			* (if bot.role == "PATIENT_ZERO" then GameConfig.Combat.PatientZero.SprintMult else 1)
 			* bot.difficulty.speedMult
-		-- Stalking hangs back at a walk; committing to the kill is a sprint.
-		if state == "STALK" then
-			chaseSpeed *= 0.85
+		if state == "HUNT" then
+			chaseSpeed = math.max(chaseSpeed, sprint * GameConfig.Bots.HuntSpeedMult / 1.5)
+		elseif threatVisible then
+			-- Stalking hangs back slightly, but never below a survivor's walking pace.
+			chaseSpeed *= 0.9
 		end
 		local goal = threatPos or bot.lastKnown
 		if goal == nil then
@@ -1129,15 +1150,19 @@ function BotService:_stepBot(bot: Bot, now: number, targets: { Target }, threats
 			if bot.windupUntil == nil then
 				if now - bot.lastAction > 1 * bot.difficulty.reactionMult then
 					bot.windupUntil = now + GameConfig.Bots.MeleeWindup
-					bot.humanoid:Move(Vector3.zero)
 				end
 			elseif now >= (bot.windupUntil :: number) then
 				bot.windupUntil = nil
 				bot.lastAction = now
-				-- Re-check range at the end of the wind-up so the swing can be dodged.
+				-- Re-check range at the end of the wind-up so the swing can be dodged, but
+				-- against LIVE positions and with lunge reach. Checking the tick-start
+				-- snapshot at exact melee range meant a survivor who kept walking was always
+				-- already gone, so the swing could never land.
+				local reach = range * GameConfig.Bots.MeleeLungeReach
 				local victim: Target? = nil
 				for _, t in targets do
-					if (t.pos - bot.root.Position).Magnitude <= range then
+					local livePos = if t.root and t.root.Parent then t.root.Position else t.pos
+					if (livePos - bot.root.Position).Magnitude <= reach then
 						victim = t
 						break
 					end

@@ -190,13 +190,28 @@ local GameConfig = {
 		VisionConeDeg = 110,
 		PeripheralRange = 10, -- inside this you're noticed regardless of facing
 		MemorySeconds = 6, -- how long a lost target stays worth searching for
+		-- Infected sense living flesh within this radius even without line of sight. This is
+		-- deliberately NOT a wallhack: they get a position to move toward, not a lock, and
+		-- it is short enough that you can break away round a corner. Removing the old
+		-- unconditional wallhack without adding this made zombies wander at random and
+		-- never convert anyone, so rounds never ended.
+		InfectedSenseRadius = 80,
 		HearingRange = 90, -- gunfire within this radius draws bots to the SOUND (never
 		-- to the shooter's identity — that would leak the hidden PZ)
 		SearchRadiusBase = 10,
 		SearchRadiusGrowth = 4,
 
-		-- Zombie bots telegraph before converting instead of touching you to death.
-		MeleeWindup = 0.45,
+		-- Zombie bots telegraph before converting instead of touching you to death. Kept
+		-- short: the think interval is 0.35s, so a long wind-up costs several ticks.
+		MeleeWindup = 0.3,
+		-- Reach at the moment the swing lands. Slightly beyond MeleeRange because the bot is
+		-- lunging into it, and because both parties move between the tick that started the
+		-- wind-up and the tick that resolves it.
+		MeleeLungeReach = 1.6,
+		-- Chase speed multiplier while committed to a kill. This has to beat a sprinting
+		-- survivor (SprintWalkSpeed) or the horde can never catch anyone and the round never
+		-- ends - which is exactly what the combat simulation caught.
+		HuntSpeedMult = 1.55,
 
 		-- Difficulty tiers rolled per-bot at spawn. These now scale aim, rate of fire and
 		-- perception too — previously only chase speed and one delay differed, so a Rookie
