@@ -183,6 +183,11 @@ end
 
 -- How many bots to field given the human count (fill up to a target headcount).
 function BotService:plannedCount(humanCount: number): number
+	-- Honour the config switch. Nothing outside a smoke-test assertion used to read this, so
+	-- turning it off left bots running anyway — a config flag that lies is worse than no flag.
+	if not GameConfig.Bots.Enabled then
+		return 0
+	end
 	if humanCount <= 0 then
 		return 0
 	end
