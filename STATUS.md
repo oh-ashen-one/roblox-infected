@@ -1,18 +1,30 @@
 # 🎉 LIVE — https://www.roblox.com/games/78267419085369/INFECTED-Hidden-Zombie-Among-You
 
-**Published PUBLIC on Roblox 2026-07-17** (universe 10518289514, place 78267419085369,
-by @solashenone). 30-player servers, icon + thumbnails + keyword description, Mild/16+
-maturity label, all products free. Currently reaching 16+ & trusted friends; opens to
-all-ages the moment 2-step verification is completed (Settings → Eligibility). No
-re-publish needed for that.
+**Version 7 published 2026-07-28** (universe 10518289514, place 78267419085369) via
+`scripts/publish.sh`, HTTP 200. This is the "make it playable" build — see the
+feat/game-feel merge for the full account. Headline changes:
 
-**Public round verified 2026-07-17:** launched the live public game from the Roblox
-page → a real Roblox Cloud Compute (RCC) server spun up (DatacenterId 387) and the
-play client (`isPlayClient=1`) booted our game on it — player log shows
-`[INFECTED] Client booted` + `Server Prefix: ..._RCC_d6dd4`. The game is joinable by
-strangers (16+) and runs on Roblox's live public infrastructure. A full multiplayer
-round showing conversions just needs 2+ players in the server (prod config; Studio
-fast-timers not in play live).
+- **Combat is readable.** There was no crosshair at all; aim came from the free mouse cursor
+  while the hitmarker drew at screen centre. Now centre aim with mouse lock, an
+  over-the-shoulder camera, hold-to-fire, ADS, visible impacts on a miss, and one shared
+  spread model behind the reticle, the tracer and the server's raycast.
+- **Zombies are visible.** No outline existed anywhere in the repo; they now carry an
+  occluded Highlight, brighter emissive bodies and role-coloured nametags.
+- **Bots are opponents.** Real animated R15 avatars (were five armless welded blocks), a
+  state machine with hysteresis, vision cones, memory, hearing, damage reactions, gunfire
+  that actually raycasts so misses are visible, and idle emotes.
+- **Three real maps** instead of five grey boxes (~450 parts across five -> 1,569 across
+  three), with stairs, catwalks, ladders, signage and per-map lighting identity.
+- **Emotes shipped** — the note below claiming they needed uploaded assets was wrong.
+
+Fixed en route: CI red since Jul 18; zombie bot respawn (a dead Humanoid can't be revived,
+so the horde silently died out after the first kill); an R6-only ragdoll that produced
+nothing on R15; the Blackout modifier restoring stale lighting; a config flag that did
+nothing; and two bugs introduced during this work that made rounds unwinnable, caught by
+simulating combat rather than trusting the boot check.
+
+103 -> 138 tests. Open question: infection pace is untuned by hand — `HuntSpeedMult`,
+`InfectedSenseRadius` and `MeleeWindup` in GameConfig are the dials.
 
 # 🚀 "1000×" upgrade — LIVE (published 2026-07-18, version 6)
 
