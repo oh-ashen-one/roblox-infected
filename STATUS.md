@@ -105,7 +105,9 @@ Final closures:
 The only remaining items are hard-blocked on things I cannot do autonomously:
 - **Publish to the live place** — needs a Roblox Open Cloud API key (verified none exists on
   this machine; only the owner can mint one) via `scripts/publish.sh`, or a Studio publish.
-- **Emotes** — require animation assets uploaded to the Roblox account; can't create/upload.
+- ~~**Emotes**~~ — DONE. This was wrong: Roblox's own emote animations are public. All 7
+  verified loading and playing on the live engine (tests/asset-probe2.lua); shipped as an
+  emote wheel. The hidden PZ can emote, which is a free bluff.
 - **Full party matchmaking** — reserved servers + live multiplayer testing (friend *invite*
   already ships).
 - Perf *numeric tuning* + ragdoll/effect *visual polish* — need a live playtest/profile.

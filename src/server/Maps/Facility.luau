@@ -283,6 +283,7 @@ return {
 		FogStart = 80,
 		FogEnd = 520,
 		FogColor = Color3.fromRGB(120, 134, 144),
+		sky = { StarCount = 0, SunAngularSize = 18 },
 		atmosphere = {
 			Density = 0.22,
 			Haze = 0.8,

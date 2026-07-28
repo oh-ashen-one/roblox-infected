@@ -64,7 +64,10 @@ local Specs: { [string]: Spec } = {
 		ratePerSecond = 8,
 	},
 
+	PlayEmote = { validator = v.shape({ emoteId = v.str(32) }), ratePerSecond = 2 },
+
 	-- Server -> Client (no validator/rate limit; server is trusted)
+	EmotePlayed = {},
 	RoundState = {},
 	RoleAssigned = {},
 	KillFeed = {},

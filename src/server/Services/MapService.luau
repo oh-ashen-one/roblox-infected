@@ -184,6 +184,15 @@ function MapService:_applyLighting(def: any)
 		atmosphere.Haze = 0
 	end
 
+	-- Sky. A custom skybox would need six uploaded textures, but StarCount/SunAngularSize on
+	-- the stock sky are free and make a night map read as night rather than as a dark room.
+	local skyDef = def.sky
+	local sky = ensure("Sky", "MapSky") :: Sky
+	sky.StarCount = if skyDef then skyDef.StarCount or 3000 else 3000
+	sky.CelestialBodiesShown = if skyDef then skyDef.CelestialBodiesShown ~= false else true
+	sky.SunAngularSize = if skyDef then skyDef.SunAngularSize or 21 else 21
+	sky.MoonAngularSize = if skyDef then skyDef.MoonAngularSize or 11 else 11
+
 	local fx = def.postFx
 	local correction = ensure("ColorCorrectionEffect", "MapColorCorrection") :: ColorCorrectionEffect
 	local bloom = ensure("BloomEffect", "MapBloom") :: BloomEffect
