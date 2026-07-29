@@ -1,7 +1,9 @@
 --!strict
 -- Intermission map vote: three buttons, highlights your pick.
+-- MenuState unlocks mouse lock so the vote buttons are actually clickable on desktop.
 
 local Theme = require(script.Parent.Theme)
+local MenuState = require(script.Parent.MenuState)
 
 local MapVote = {}
 
@@ -17,7 +19,9 @@ function MapVote.start(remotes: any)
 		Position = UDim2.new(0.5, -280, 1, -116),
 		BackgroundTransparency = 0.2,
 		Visible = false,
+		Active = true,
 	})
+	MenuState.track(panel)
 	Theme.corner(panel, 12)
 	Theme.gradient(panel, Theme.Colors.PanelLight, Theme.Colors.Panel, 90)
 	Theme.stroke(panel, Color3.fromRGB(60, 64, 78), 1, 0.35)
@@ -38,7 +42,7 @@ function MapVote.start(remotes: any)
 			Text = MAP_NAMES[i] or ("Map " .. i),
 			TextSize = 15,
 		})
-		button.MouseButton1Click:Connect(function()
+		button.Activated:Connect(function()
 			remotes.fire("VoteMap", { mapIndex = i })
 			for j, other in buttons do
 				other.BackgroundColor3 = if j == i then Theme.Colors.Survivor else Theme.Colors.PanelLight
