@@ -1,8 +1,9 @@
 # 🎉 LIVE — https://www.roblox.com/games/78267419085369/INFECTED-Hidden-Zombie-Among-You
 
-## Hotfix (unshipped) — false kicks + stuck tutorial + age notes
+## Hotfix LIVE — version 8 (2026-07-29)
 
-Playtest reports (2026-07-29):
+Published via Open Cloud (`scripts/publish.sh`, HTTP 200, versionNumber 8).
+API key sourced from `midir@midirstudio.local:~/.config/infected/secrets.env`.
 
 1. **Kick: "Suspicious activity detected." (Error 267)** — anti-cheat treated map
    spawns / zombie respawns as teleports, then kept `lastPos` on the *pre-snap*
@@ -13,11 +14,10 @@ Playtest reports (2026-07-29):
    `MenuState`, so mouse stayed lock-centered (no cursor) and NEXT/PLAY never
    received clicks. Fixed: `MenuState.track`, SKIP, keyboard Enter/Esc, higher
    DisplayOrder, `Activated` instead of mouse-only.
-3. **Ages 16+** — not a Luau gate. Owner must finish Creator Hub **Publish to all
-   ages** eligibility + set Audience/maturity on the experience. Steps in
-   `docs/runbook.md` → "Audience / age gate".
 
-Republish with `scripts/publish.sh` (or Studio) before these hit live servers.
+Rejoin a **new server** (old servers keep v7 until they recycle; Creator Dashboard →
+Restart servers for updates if you need it immediate). Age/audience (16+) is a
+Creator Hub experience-reach gate, not in this build.
 
 ---
 
