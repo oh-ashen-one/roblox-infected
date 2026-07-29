@@ -57,11 +57,9 @@ local function storefront(
 		Kit.wallZ(geo, x + w / 2, z, d, h, y, wallProps)
 	end
 
-	if kind == 3 then
-		Kit.wallX(geo, x, backZ, w, h, y, wallProps)
-	else
-		Kit.wallXDoor(geo, x, backZ, w, h, y, 8, wallProps)
-	end
+	-- Always leave a back exit. Kind 3 used to seal the rear wall, which created
+	-- genuine soft-lock rooms if a spawn/path landed inside.
+	Kit.wallXDoor(geo, x, backZ, w, h, y, 8, wallProps)
 
 	Kit.floor(geo, x, z, w, d, y + h, { Color = C.DarkFloor, Material = Enum.Material.Concrete })
 
@@ -211,37 +209,38 @@ return {
 			Kit.patrolMarker(patrol, cx, FLOOR3, -ATRIUM_D / 2 - 12)
 		end
 
+		-- Concourse + atrium ring only (open walkways). Avoid deep store interiors.
 		local spots = {
-			{ -125, -70, GROUND },
-			{ -125, 70, GROUND },
-			{ -95, -20, GROUND },
-			{ -95, 20, GROUND },
-			{ -60, -75, GROUND },
-			{ -60, 75, GROUND },
-			{ -30, -45, GROUND },
-			{ -30, 45, GROUND },
-			{ 0, -80, GROUND },
-			{ 0, 80, GROUND },
-			{ 30, -45, GROUND },
-			{ 30, 45, GROUND },
-			{ 60, -75, GROUND },
-			{ 60, 75, GROUND },
-			{ 95, -20, GROUND },
-			{ 95, 20, GROUND },
-			{ 125, -70, GROUND },
-			{ 125, 70, GROUND },
-			{ -110, -60, FLOOR2 },
-			{ -110, 60, FLOOR2 },
-			{ -70, -60, FLOOR2 },
-			{ 70, 60, FLOOR2 },
-			{ 110, -60, FLOOR2 },
-			{ 110, 60, FLOOR2 },
-			{ -40, -60, FLOOR2 },
-			{ 40, 60, FLOOR2 },
-			{ -60, -47, FLOOR3 },
-			{ 60, 47, FLOOR3 },
-			{ 0, -47, FLOOR3 },
-			{ 0, 47, FLOOR3 },
+			{ -40, -20, GROUND },
+			{ -40, 20, GROUND },
+			{ 40, -20, GROUND },
+			{ 40, 20, GROUND },
+			{ 0, -30, GROUND },
+			{ 0, 30, GROUND },
+			{ -80, 0, GROUND },
+			{ 80, 0, GROUND },
+			{ -20, -60, GROUND },
+			{ -20, 60, GROUND },
+			{ 20, -60, GROUND },
+			{ 20, 60, GROUND },
+			{ -100, -40, GROUND },
+			{ -100, 40, GROUND },
+			{ 100, -40, GROUND },
+			{ 100, 40, GROUND },
+			{ 0, -75, GROUND },
+			{ 0, 75, GROUND },
+			{ -50, 0, FLOOR2 },
+			{ 50, 0, FLOOR2 },
+			{ 0, -50, FLOOR2 },
+			{ 0, 50, FLOOR2 },
+			{ -90, -30, FLOOR2 },
+			{ 90, 30, FLOOR2 },
+			{ -30, -55, FLOOR2 },
+			{ 30, 55, FLOOR2 },
+			{ -40, -40, FLOOR3 },
+			{ 40, 40, FLOOR3 },
+			{ 0, -40, FLOOR3 },
+			{ 0, 40, FLOOR3 },
 		}
 		for _, spot in spots do
 			Kit.spawnMarker(survivorSpawns, spot[1], spot[3], spot[2])

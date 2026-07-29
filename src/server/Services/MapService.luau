@@ -228,6 +228,16 @@ function MapService:loadLobby()
 end
 
 -- Spawns -------------------------------------------------------------------------
+--
+-- Markers are author intent; geometry can still trap a character (inside a house shell,
+-- jammed in furniture, under a low ceiling). Every public spawn API resolves through
+-- `_safeSpawnFrom` so we never hand RoleService / bots a CFrame that is stuck in world
+-- collision.
+
+local SPAWN_HRP_HEIGHT = 3.0 -- studs above floor for HumanoidRootPart
+local SPAWN_CLEAR_RADIUS = 1.6
+local SPAWN_MIN_HEADROOM = 5.5
+local SPAWN_WALL_PROBE = 2.2 -- reject if a wall is this close on every axis
 
 function MapService:_spawnsIn(folderName: string): { BasePart }
 	local out = {}
@@ -244,16 +254,170 @@ function MapService:_spawnsIn(folderName: string): { BasePart }
 	return out
 end
 
-function MapService:randomSurvivorSpawn(): CFrame?
-	local spawns = self:_spawnsIn("SurvivorSpawns")
-	if #spawns == 0 then
-		return nil
+function MapService:_excludeList(extraExclude: { Instance }?): { Instance }
+	local exclude: { Instance } = {}
+	if self._active then
+		local survivors = self._active:FindFirstChild("SurvivorSpawns")
+		local zombies = self._active:FindFirstChild("ZombieSpawns")
+		local patrol = self._active:FindFirstChild("PatrolPoints")
+		if survivors then
+			table.insert(exclude, survivors)
+		end
+		if zombies then
+			table.insert(exclude, zombies)
+		end
+		if patrol then
+			table.insert(exclude, patrol)
+		end
 	end
-	return spawns[rng:NextInteger(1, #spawns)].CFrame
+	-- Living characters occupy volume; never treat them as "stuck in geometry".
+	for _, player in Players:GetPlayers() do
+		if player.Character then
+			table.insert(exclude, player.Character)
+		end
+	end
+	for _, child in workspace:GetChildren() do
+		if child:IsA("Model") and child:GetAttribute("IsBot") == true then
+			table.insert(exclude, child)
+		end
+	end
+	if extraExclude then
+		for _, inst in extraExclude do
+			table.insert(exclude, inst)
+		end
+	end
+	return exclude
 end
 
--- Nearest zombie spawn to any survivor that is >=25 studs away and has no clear
--- line of sight to a survivor; falls back to random.
+function MapService:_rayParams(extraExclude: { Instance }?): RaycastParams
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = self:_excludeList(extraExclude)
+	return params
+end
+
+-- Try to turn a rough position into a standable, unobstructed spawn CFrame.
+-- Returns nil if the candidate is sealed / inside geometry / has no floor.
+function MapService:_resolveOpenSpawn(approx: Vector3, extraExclude: { Instance }?): CFrame?
+	local params = self:_rayParams(extraExclude)
+	-- Drop from above so we land on the topmost floor, not a roof slab below a ceiling.
+	local dropFrom = approx + Vector3.new(0, 24, 0)
+	local floorHit = workspace:Raycast(dropFrom, Vector3.new(0, -60, 0), params)
+	if floorHit == nil or not floorHit.Instance.CanCollide then
+		return nil
+	end
+	-- Reject steep surfaces (walls mistaken for floors).
+	if floorHit.Normal.Y < 0.7 then
+		return nil
+	end
+	local feet = floorHit.Position
+	local hrp = feet + Vector3.new(0, SPAWN_HRP_HEIGHT, 0)
+
+	-- Headroom: must be able to stand without a ceiling immediately overhead.
+	local headHit = workspace:Raycast(hrp, Vector3.new(0, SPAWN_MIN_HEADROOM, 0), params)
+	if headHit and headHit.Instance.CanCollide then
+		return nil
+	end
+
+	-- Horizontal breathing room: at least one axis must not be a tight corridor cage.
+	-- (We still allow true hallways; we reject being fully wedged.)
+	local blocked = 0
+	for _, dir in {
+		Vector3.new(1, 0, 0),
+		Vector3.new(-1, 0, 0),
+		Vector3.new(0, 0, 1),
+		Vector3.new(0, 0, -1),
+	} do
+		local hit = workspace:Raycast(hrp, dir * SPAWN_WALL_PROBE, params)
+		if hit and hit.Instance.CanCollide and hit.Distance < 1.1 then
+			blocked += 1
+		end
+	end
+	if blocked >= 3 then
+		return nil -- almost fully boxed in
+	end
+
+	-- Volume check: no solid part overlapping the character capsule.
+	local overlap = OverlapParams.new()
+	overlap.FilterType = Enum.RaycastFilterType.Exclude
+	overlap.FilterDescendantsInstances = self:_excludeList(extraExclude)
+	local parts = workspace:GetPartBoundsInRadius(hrp, SPAWN_CLEAR_RADIUS, overlap)
+	for _, part in parts do
+		if part:IsA("BasePart") and part.CanCollide and part.Transparency < 1 then
+			-- Floors under our feet are fine; anything else in the body volume is a trap.
+			local top = part.Position.Y + part.Size.Y / 2
+			if top > feet.Y + 0.6 then
+				return nil
+			end
+		end
+	end
+
+	return CFrame.new(hrp)
+end
+
+function MapService:_safeSpawnFrom(markers: { BasePart }, prefer: ((BasePart) -> number)?): CFrame?
+	if #markers == 0 then
+		return self:_fallbackOpenSpawn()
+	end
+	-- Shuffle so retries don't always pick the same bad marker first.
+	local order = table.create(#markers)
+	for i = 1, #markers do
+		order[i] = markers[i]
+	end
+	for i = #order, 2, -1 do
+		local j = rng:NextInteger(1, i)
+		order[i], order[j] = order[j], order[i]
+	end
+	if prefer then
+		table.sort(order, function(a, b)
+			return prefer(a) < prefer(b)
+		end)
+	end
+	for _, marker in order do
+		local resolved = self:_resolveOpenSpawn(marker.Position)
+		if resolved then
+			return resolved
+		end
+		-- Nudge outward from the marker in 4 directions and retry (escape furniture clusters).
+		for _, offset in {
+			Vector3.new(6, 0, 0),
+			Vector3.new(-6, 0, 0),
+			Vector3.new(0, 0, 6),
+			Vector3.new(0, 0, -6),
+			Vector3.new(10, 0, 10),
+			Vector3.new(-10, 0, -10),
+		} do
+			resolved = self:_resolveOpenSpawn(marker.Position + offset)
+			if resolved then
+				return resolved
+			end
+		end
+	end
+	return self:_fallbackOpenSpawn()
+end
+
+-- Last resort: open ground near map origin so a round can never soft-lock on a bad marker.
+function MapService:_fallbackOpenSpawn(): CFrame?
+	for _, candidate in {
+		Vector3.new(0, 4, 0),
+		Vector3.new(20, 4, 0),
+		Vector3.new(-20, 4, 0),
+		Vector3.new(0, 4, 20),
+		Vector3.new(0, 4, -20),
+		Vector3.new(40, 4, 40),
+	} do
+		local resolved = self:_resolveOpenSpawn(candidate)
+		if resolved then
+			return resolved
+		end
+	end
+	return CFrame.new(0, 8, 0)
+end
+
+function MapService:randomSurvivorSpawn(): CFrame?
+	return self:_safeSpawnFrom(self:_spawnsIn("SurvivorSpawns"))
+end
+
 -- A wander destination for bots. Prefers map-authored PatrolPoints; falls back to spawn
 -- markers so this works on maps that predate them. Bots previously wandered between spawn
 -- markers only, which made them ping-pong and clump in the same few spots every round.
@@ -263,9 +427,22 @@ function MapService:randomPatrolPoint(): Vector3?
 	if folder then
 		local points = folder:GetChildren()
 		if #points > 0 then
-			local pick = points[math.random(1, #points)]
-			if pick:IsA("BasePart") then
-				return pick.Position
+			-- Prefer patrols that resolve to open ground.
+			local shuffled = {}
+			for _, p in points do
+				if p:IsA("BasePart") then
+					table.insert(shuffled, p)
+				end
+			end
+			for i = #shuffled, 2, -1 do
+				local j = rng:NextInteger(1, i)
+				shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+			end
+			for _, pick in shuffled do
+				local resolved = self:_resolveOpenSpawn(pick.Position)
+				if resolved then
+					return resolved.Position
+				end
 			end
 		end
 	end
@@ -278,9 +455,8 @@ function MapService:zombieSpawnNearAction(survivorRoots: { BasePart }): CFrame?
 	if #spawns == 0 then
 		return self:randomSurvivorSpawn()
 	end
-	local best: BasePart? = nil
-	local bestDist = math.huge
-	for _, marker in spawns do
+	-- Score: prefer near action, not visible, not on top of survivors — then safety filter.
+	return self:_safeSpawnFrom(spawns, function(marker: BasePart): number
 		local nearest = math.huge
 		local visible = false
 		for _, root in survivorRoots do
@@ -288,24 +464,23 @@ function MapService:zombieSpawnNearAction(survivorRoots: { BasePart }): CFrame?
 			local dist = offset.Magnitude
 			nearest = math.min(nearest, dist)
 			if dist < 120 then
-				local params = RaycastParams.new()
-				params.FilterType = Enum.RaycastFilterType.Exclude
-				params.FilterDescendantsInstances = { root.Parent :: Instance }
+				local params = self:_rayParams({ root.Parent :: Instance })
 				local hit = workspace:Raycast(marker.Position, offset, params)
 				if hit == nil then
 					visible = true
 				end
 			end
 		end
-		if nearest >= 25 and not visible and nearest < bestDist then
-			best = marker
-			bestDist = nearest
+		-- Lower score = better. Penalize too-close and line-of-sight.
+		local score = nearest
+		if nearest < 25 then
+			score += 200
 		end
-	end
-	if best == nil then
-		best = spawns[rng:NextInteger(1, #spawns)]
-	end
-	return (best :: BasePart).CFrame
+		if visible then
+			score += 100
+		end
+		return score
+	end)
 end
 
 function MapService:start()

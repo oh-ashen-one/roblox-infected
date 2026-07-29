@@ -108,8 +108,10 @@ local function house(
 	Kit.box(geo, x - 6, GROUND, z + 5, 7, 3, 3, { Color = C.Wood, Material = Enum.Material.Wood })
 	Kit.box(geo, x + 7, GROUND, z - 6, 4, 5, 4, { Color = C.Wood, Material = Enum.Material.Wood })
 
-	Kit.spawnMarker(zombieSpawns, x, GROUND, z)
-	Kit.patrolMarker(patrol, x, GROUND, z)
+	-- Zombie spawn OUTSIDE the front door — never at house center (players/bots used to
+	-- materialise inside furniture and sealed rooms with no clear exit).
+	Kit.spawnMarker(zombieSpawns, x, GROUND, z + facing * (d / 2 + 10))
+	Kit.patrolMarker(patrol, x, GROUND, z + facing * (d / 2 + 6))
 	Kit.patrolMarker(patrol, x, topY, z)
 end
 
@@ -291,37 +293,39 @@ return {
 			end
 		end
 
+		-- Survivor spawns stay on open road / sidewalk / park — NOT house centers or
+		-- interior coords that can land you inside a wall or sofa.
 		local spots = {
-			{ -130, -30 },
-			{ -130, 30 },
+			{ -130, 0 },
 			{ -100, 0 },
-			{ -95, -80 },
-			{ -95, 80 },
-			{ -60, -20 },
-			{ -60, 20 },
-			{ -30, -85 },
-			{ -30, 85 },
+			{ -60, 0 },
 			{ -20, 0 },
+			{ 20, 0 },
+			{ 60, 0 },
+			{ 100, 0 },
+			{ 130, 0 },
 			{ 0, -40 },
 			{ 0, 40 },
-			{ 20, -90 },
-			{ 20, 90 },
-			{ 35, 0 },
-			{ 60, -30 },
-			{ 60, 30 },
-			{ 80, -70 },
-			{ 85, 70 },
-			{ 100, -50 },
-			{ 105, 55 },
-			{ 120, 0 },
-			{ 130, -85 },
-			{ 130, 85 },
-			{ -75, -55 },
-			{ -75, 55 },
-			{ -45, -60 },
-			{ -45, 60 },
-			{ 45, -60 },
-			{ 45, 60 },
+			{ 0, -80 },
+			{ 0, 80 },
+			{ -40, -20 },
+			{ -40, 20 },
+			{ 40, -20 },
+			{ 40, 20 },
+			{ -90, -30 },
+			{ -90, 30 },
+			{ 90, -30 },
+			{ 90, 30 },
+			{ -120, -40 },
+			{ -120, 40 },
+			{ 120, -40 },
+			{ 120, 40 },
+			{ -20, -50 },
+			{ -20, 50 },
+			{ 50, -80 },
+			{ 50, 80 },
+			{ -50, -80 },
+			{ -50, 80 },
 		}
 		for _, spot in spots do
 			Kit.spawnMarker(survivorSpawns, spot[1], GROUND, spot[2])
