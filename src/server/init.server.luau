@@ -269,6 +269,12 @@ roundService = RoundService.new({
 		local pzIsHuman = humanCount > 0 and rng:NextInteger(1, totalParticipants) <= humanCount
 
 		roleService:assignRoles(playersInRound, { allSurvivors = not pzIsHuman })
+		-- assignRoles can yield on LoadCharacter and used to push a humans-only survivor
+		-- count mid-setup (0 when the sole human is PZ) which ended the round as INFECTED
+		-- before bots existed. Abort cleanly if something else already ended us.
+		if roundService:getState() ~= "ACTIVE" then
+			return
+		end
 		botService:spawnForRound(botCount, { botIsPZ = not pzIsHuman })
 		if not pzIsHuman then
 			local pzName = botService:patientZeroName()
@@ -276,6 +282,7 @@ roundService = RoundService.new({
 				roleService:setOriginalPZName(pzName)
 			end
 		end
+		-- First authoritative human+bot count of the round. Must run after bots spawn.
 		refreshCounts()
 	end,
 	onRoundEnd = function(winner)

@@ -93,9 +93,35 @@ function tests.infected_win_on_full_conversion()
 	local m = RoundMachine.new(CONFIG)
 	m:setPlayerCount(5, 0)
 	m:tick(25)
+	-- Past setup grace (5s): zero survivors ends the round.
 	local fx = m:setSurvivorCount(0, 60)
 	assert(#fx == 1 and fx[1].type == "EndRound" and fx[1].winner == "INFECTED", effectTypes(fx))
 	assert(m.state == "ROUND_END")
+end
+
+function tests.zero_survivors_during_setup_grace_does_not_end_round()
+	-- Reproduces the live bug: sole human is Patient Zero, humans-only count is 0
+	-- before bots spawn. Must NOT crown INFECTED during the setup grace window.
+	local m = RoundMachine.new(CONFIG)
+	m:setPlayerCount(8, 0) -- 1 human + 7 planned bots
+	m:tick(25) -- ACTIVE at t=25, grace until t=30
+	assert(m.state == "ACTIVE")
+	local fx = m:setSurvivorCount(0, 26)
+	assert(#fx == 0, "setup grace must swallow interim zero-survivor reports")
+	assert(m.state == "ACTIVE")
+	-- After bots would have been fielded, a real zero still ends the round.
+	fx = m:setSurvivorCount(0, 31)
+	assert(#fx == 1 and fx[1].type == "EndRound" and fx[1].winner == "INFECTED", effectTypes(fx))
+end
+
+function tests.setup_grace_expires_with_zero_on_tick()
+	local m = RoundMachine.new(CONFIG)
+	m:setPlayerCount(4, 0)
+	m:tick(25)
+	m:setSurvivorCount(0, 26) -- held by grace
+	assert(m.state == "ACTIVE")
+	local fx = m:tick(30) -- grace ends; still zero survivors
+	assert(#fx == 1 and fx[1].type == "EndRound" and fx[1].winner == "INFECTED", effectTypes(fx))
 end
 
 function tests.round_end_flows_back_to_intermission()

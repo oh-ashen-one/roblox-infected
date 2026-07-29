@@ -261,7 +261,10 @@ function RoleService:assignRoles(playersInRound: { Player }, opts: { allSurvivor
 		self._deps.onPatientZeroGone()
 	end
 
-	self._deps.onSurvivorCountChanged(self:survivorCount())
+	-- Do NOT push survivor count here. assignRoles runs before botService:spawnForRound
+	-- in onRoundStart; notifying with humans-only (often 0 when the sole human is PZ)
+	-- made the round machine end as INFECTED instantly. Caller must refreshCounts()
+	-- after bots are fielded.
 end
 
 function RoleService:endRound()

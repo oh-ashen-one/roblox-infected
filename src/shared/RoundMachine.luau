@@ -26,6 +26,10 @@ export type RoundMachine = {
 	state: State,
 	deadline: number?, -- unix-ish clock supplied by caller
 	roundStartedAt: number?,
+	-- Until this clock time, survivorCount <= 0 must NOT end the round. Covers the
+	-- assignRoles → spawnBots setup window where humans-only can briefly read as 0
+	-- survivors (solo Patient Zero before bots exist).
+	setupGraceUntil: number?,
 	playerCount: number,
 	survivorCount: number,
 	conversions: number,
@@ -37,6 +41,9 @@ export type RoundMachine = {
 	tick: (self: RoundMachine, now: number) -> { Effect },
 }
 
+-- Seconds after StartRound during which a zero survivor count is ignored.
+local SETUP_GRACE_SECONDS = 5
+
 local RoundMachine = {}
 RoundMachine.__index = RoundMachine
 
@@ -46,6 +53,7 @@ local function new(config: RoundConfig): RoundMachine
 		state = "WAITING" :: State,
 		deadline = nil :: number?,
 		roundStartedAt = nil :: number?,
+		setupGraceUntil = nil :: number?,
 		playerCount = 0,
 		survivorCount = 0,
 		conversions = 0,
@@ -62,6 +70,7 @@ end
 local function enterRoundEnd(self, now: number, winner): Effect
 	self.state = "ROUND_END"
 	self.deadline = now + self.config.RevealSeconds
+	self.setupGraceUntil = nil
 	return { type = "EndRound", winner = winner, endsAt = self.deadline :: number }
 end
 
@@ -83,6 +92,11 @@ function RoundMachine.setSurvivorCount(self, n: number, now: number): { Effect }
 	self.survivorCount = n
 	local effects = {}
 	if self.state == "ACTIVE" and n <= 0 then
+		local grace = self.setupGraceUntil
+		if grace ~= nil and now < grace then
+			-- Setup still in flight (roles/bots); do not crown INFECTED yet.
+			return effects
+		end
 		table.insert(effects, enterRoundEnd(self, now, "INFECTED"))
 	end
 	return effects
@@ -109,6 +123,15 @@ function RoundMachine.recordConversion(self, _now: number): { Effect }
 end
 
 function RoundMachine.tick(self, now: number): { Effect }
+	-- Setup grace can expire mid-round (before the timer deadline). If the post-setup
+	-- count is still zero survivors, end as INFECTED without waiting out BaseRoundSeconds.
+	if self.state == "ACTIVE" and self.setupGraceUntil ~= nil and now >= self.setupGraceUntil then
+		self.setupGraceUntil = nil
+		if self.survivorCount <= 0 then
+			return { enterRoundEnd(self, now, "INFECTED") }
+		end
+	end
+
 	local deadline = self.deadline
 	if deadline == nil or now < deadline then
 		return {}
@@ -118,16 +141,18 @@ function RoundMachine.tick(self, now: number): { Effect }
 		if self.playerCount >= self.config.MinPlayersToStart then
 			self.state = "ACTIVE"
 			self.roundStartedAt = now
+			self.setupGraceUntil = now + SETUP_GRACE_SECONDS
 			self.conversions = 0
 			-- One player is Patient Zero, not a survivor. RoleService reports the
 			-- authoritative count after spawning, but that loop yields — this keeps
-			-- the interim value correct (finding #5).
+			-- the interim value correct (finding #5). playerCount includes planned bots.
 			self.survivorCount = math.max(self.playerCount - 1, 0)
 			self.deadline = now + self.config.BaseRoundSeconds
 			return { { type = "StartRound", endsAt = self.deadline :: number } }
 		else
 			self.state = "WAITING"
 			self.deadline = nil
+			self.setupGraceUntil = nil
 			return { { type = "ReturnToWaiting" } }
 		end
 	elseif self.state == "ACTIVE" then
