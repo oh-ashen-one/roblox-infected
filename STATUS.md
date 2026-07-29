@@ -1,5 +1,26 @@
 # 🎉 LIVE — https://www.roblox.com/games/78267419085369/INFECTED-Hidden-Zombie-Among-You
 
+## Hotfix (unshipped) — false kicks + stuck tutorial + age notes
+
+Playtest reports (2026-07-29):
+
+1. **Kick: "Suspicious activity detected." (Error 267)** — anti-cheat treated map
+   spawns / zombie respawns as teleports, then kept `lastPos` on the *pre-snap*
+   position so flags looped until kick. Fixed: spawn grace, `noteTrustedTeleport`
+   from RoleService, lastPos re-anchored after snap, flag decay, slightly higher
+   speed/teleport slack + kick threshold.
+2. **WELCOME TO INFECTED tutorial undismissable** — overlay never registered with
+   `MenuState`, so mouse stayed lock-centered (no cursor) and NEXT/PLAY never
+   received clicks. Fixed: `MenuState.track`, SKIP, keyboard Enter/Esc, higher
+   DisplayOrder, `Activated` instead of mouse-only.
+3. **Ages 16+** — not a Luau gate. Owner must finish Creator Hub **Publish to all
+   ages** eligibility + set Audience/maturity on the experience. Steps in
+   `docs/runbook.md` → "Audience / age gate".
+
+Republish with `scripts/publish.sh` (or Studio) before these hit live servers.
+
+---
+
 **Version 7 published 2026-07-28** (universe 10518289514, place 78267419085369) via
 `scripts/publish.sh`, HTTP 200. This is the "make it playable" build — see the
 feat/game-feel merge for the full account. Headline changes:

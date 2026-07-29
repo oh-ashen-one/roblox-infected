@@ -48,6 +48,7 @@ local roleService
 local endgameService
 local botService
 local retentionService
+local antiCheatService
 
 -- Total survivor count = human survivors + bot survivors. Both RoleService (humans)
 -- and BotService (bots) call this whenever their counts change so the round machine
@@ -130,6 +131,12 @@ roleService = RoleService.new({
 	getEquippedGunSkin = function(player: Player)
 		local data = dataService:get(player)
 		return data and data.equipped and data.equipped.Gun or nil
+	end,
+	-- Spawn/respawn CFrame writes must not trip movement anti-cheat (was kicking real players).
+	noteTrustedTeleport = function(player: Player)
+		if antiCheatService then
+			antiCheatService:noteTrustedTeleport(player)
+		end
 	end,
 	onConversion = function(victim: Player, killer: Player?)
 		roundService:recordConversion()
@@ -234,7 +241,7 @@ local combatService = CombatService.new({
 	end,
 })
 
-local antiCheatService = AntiCheatService.new({
+antiCheatService = AntiCheatService.new({
 	remotes = remotes,
 	combatService = combatService,
 })

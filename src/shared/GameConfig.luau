@@ -258,9 +258,10 @@ local GameConfig = {
 	Movement = {
 		BaseWalkSpeed = 16,
 		SprintWalkSpeed = 24,
-		-- AntiCheat: max studs/s tolerated before flagging (sprint * PZ mult + slack)
-		MaxToleratedSpeed = 24 * 1.2 * 1.35 + 6, -- fastest legit (Runner sprint) + slack
-		TeleportFlagStuds = 80, -- moved more than this in one check window = flag
+		-- AntiCheat: max studs/s tolerated before flagging (sprint * PZ mult + slack).
+		-- Extra headroom for latency / physics spikes; false kicks were worse than soft cheats.
+		MaxToleratedSpeed = 24 * 1.2 * 1.35 + 12, -- fastest legit (Runner sprint) + slack
+		TeleportFlagStuds = 100, -- moved more than this in one check window = flag
 		CheckIntervalSeconds = 1,
 	},
 

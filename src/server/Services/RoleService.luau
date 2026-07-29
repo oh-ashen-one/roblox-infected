@@ -24,6 +24,8 @@ export type Deps = {
 	getSurvivorSpawn: (() -> CFrame?)?, -- map spawn points (nil -> default spawn)
 	getZombieSpawn: ((survivorRoots: { BasePart }) -> CFrame?)?,
 	getEquippedGunSkin: ((player: Player) -> string?)?, -- cosmetic gun tint
+	-- Optional: tell anti-cheat a CFrame write was intentional so it does not kick.
+	noteTrustedTeleport: ((player: Player) -> ())?,
 }
 
 local rng = Random.new()
@@ -236,6 +238,9 @@ function RoleService:assignRoles(playersInRound: { Player }, opts: { allSurvivor
 			local root = character:WaitForChild("HumanoidRootPart", 5)
 			if spawnCFrame and root and root:IsA("BasePart") then
 				root.CFrame = spawnCFrame
+				if self._deps.noteTrustedTeleport then
+					self._deps.noteTrustedTeleport(player)
+				end
 			end
 		end
 		applySpawnProtection(character)
@@ -499,6 +504,9 @@ function RoleService:_spawnAsZombie(player: Player)
 		local root = character:WaitForChild("HumanoidRootPart", 5)
 		if spawnCFrame and root and root:IsA("BasePart") then
 			root.CFrame = spawnCFrame
+			if self._deps.noteTrustedTeleport then
+				self._deps.noteTrustedTeleport(player)
+			end
 		end
 	end
 	applyZombieAppearance(character)

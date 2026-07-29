@@ -10,9 +10,31 @@
 ## Exploit-report triage
 
 1. Reports of speed/teleport hacking → check `AntiCheatService` kick logs (search server logs for "Suspicious activity"). If hackers survive, lower `Movement.MaxToleratedSpeed` slack or `KICK_THRESHOLD` in `AntiCheatService.luau`.
-2. Reports of impossible kills (cross-map conversions) → verify `ORIGIN_TOLERANCE` in `CombatService.luau` and the knife `MaxThrowRange`; both are server-checked, so an impossible kill means a validation gap — reproduce in Studio first.
-3. Duped coins/skins → ProfileStore session locking makes classic dupes hard; check `receipts` handling in `MonetizationService` and look for repeated `PurchaseId` grants.
-4. Always patch server-side. Never ship a client-side "fix" for an exploit.
+2. **False "Suspicious activity" kicks on join/respawn** → should be fixed (spawn grace + trusted teleports + lastPos sync after snap). If they return, confirm `noteTrustedTeleport` is still wired from RoleService and that `CharacterAdded` grace is firing.
+3. Reports of impossible kills (cross-map conversions) → verify `ORIGIN_TOLERANCE` in `CombatService.luau` and the knife `MaxThrowRange`; both are server-checked, so an impossible kill means a validation gap — reproduce in Studio first.
+4. Duped coins/skins → ProfileStore session locking makes classic dupes hard; check `receipts` handling in `MonetizationService` and look for repeated `PurchaseId` grants.
+5. Always patch server-side. Never ship a client-side "fix" for an exploit.
+
+## Audience / age gate (all ages, not 16+)
+
+Age restriction is **not** set in Luau — it lives on the experience in Creator Dashboard and on the
+owner account's publishing eligibility.
+
+To allow **anybody / any age** (Roblox Kids + Select + 16+):
+
+1. Sign in as **`solashenone`** (owner) at [create.roblox.com](https://create.roblox.com).
+2. **Settings → Eligibility → Publishing permissions** — complete Identity verification, Age check,
+   and 2-step verification until **Publish to all ages** shows ✅.
+3. Open the INFECTED experience → **Audience / Content maturity**:
+   - Re-run the maturity questionnaire honestly for a mild competitive shooter
+     (avoid marking content that forces Moderate/Restricted if you want youngest reach).
+   - Target **Minimal** or **Mild** if the product goals allow — those reach Kids + Select.
+   - **Moderate** still blocks Roblox Kids (5–8) but allows Select (9–15) + 16+.
+4. Experience **Settings → Audience** → set reach to **All ages** (or the widest option your
+   eligibility allows) → Save.
+5. If the public page still shows **Ages 16+** after eligibility is green, wait for Audience Reach
+   to re-evaluate (known platform lag) or contact Roblox support — code republish alone cannot
+   clear a 16+ publishing-eligibility lock.
 
 ## Hotfix procedure
 

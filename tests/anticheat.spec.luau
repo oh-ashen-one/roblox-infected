@@ -3,9 +3,9 @@ local AntiCheatMath = require("../src/shared/AntiCheatMath")
 
 local tests = {}
 
--- Config mirrors GameConfig.Movement: maxSpeed ~= 44.88, teleport 80, interval 1.
-local MAX = 24 * 1.2 * 1.35 + 6
-local TELE = 80
+-- Config mirrors GameConfig.Movement: maxSpeed ~= 50.88, teleport 100, interval 1.
+local MAX = 24 * 1.2 * 1.35 + 12
+local TELE = 100
 
 function tests.normal_walking_is_ok()
 	assert(AntiCheatMath.classify(16, 1, MAX, TELE) == "ok")
