@@ -61,17 +61,17 @@ function Touch.start(
 	fire.MouseLeave:Connect(function()
 		actions.setFiring(false)
 	end)
-	throwBtn.MouseButton1Click:Connect(function()
+	throwBtn.Activated:Connect(function()
 		if role == "PATIENT_ZERO" then
 			actions.throwKnife()
 		else
 			actions.melee()
 		end
 	end)
-	reload.MouseButton1Click:Connect(actions.reload)
+	reload.Activated:Connect(actions.reload)
 
 	local sprinting = false
-	sprint.MouseButton1Click:Connect(function()
+	sprint.Activated:Connect(function()
 		sprinting = not sprinting
 		actions.setSprint(sprinting)
 		sprint.BackgroundColor3 = sprinting and Theme.Colors.Survivor or Theme.Colors.PanelLight

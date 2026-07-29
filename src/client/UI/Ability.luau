@@ -46,7 +46,7 @@ function Ability.start(remotes: any)
 		end
 	end
 
-	button.MouseButton1Click:Connect(activate)
+	button.Activated:Connect(activate)
 
 	remotes.on("AbilityState", function(state)
 		local label = state.ability and ABILITY_LABELS[state.ability]

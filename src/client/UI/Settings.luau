@@ -156,7 +156,7 @@ function Settings.start()
 			Text = initial and onText or offText,
 			TextSize = 13,
 		})
-		button.MouseButton1Click:Connect(function()
+		button.Activated:Connect(function()
 			on = not on
 			button.Text = on and onText or offText
 			onChange(on)
@@ -183,6 +183,8 @@ function Settings.start()
 		BackgroundColor3 = Theme.Colors.Panel,
 		Visible = false,
 	})
+	-- Own MenuState entry so rebind stays clickable even if the main panel is closed.
+	MenuState.track(controlsPanel)
 	Theme.corner(controlsPanel, 14)
 	Theme.gradient(controlsPanel, Theme.Colors.PanelLight, Theme.Colors.Panel, 90)
 	Theme.stroke(controlsPanel, Color3.fromRGB(60, 64, 78), 1, 0.3)
@@ -198,7 +200,7 @@ function Settings.start()
 		Position = UDim2.new(1, -40, 0, 8),
 		Text = "X",
 	})
-	controlsClose.MouseButton1Click:Connect(function()
+	controlsClose.Activated:Connect(function()
 		controlsPanel.Visible = false
 	end)
 
@@ -220,7 +222,7 @@ function Settings.start()
 			Text = Keybinds.get(LocalPlayer, action),
 			TextSize = 14,
 		})
-		keyButton.MouseButton1Click:Connect(function()
+		keyButton.Activated:Connect(function()
 			listening = action
 			keyButton.Text = "press a key..."
 		end)
@@ -248,7 +250,7 @@ function Settings.start()
 		BackgroundColor3 = Theme.Colors.Survivor,
 		TextColor3 = Theme.Colors.Bg,
 	})
-	controlsButton.MouseButton1Click:Connect(function()
+	controlsButton.Activated:Connect(function()
 		controlsPanel.Visible = not controlsPanel.Visible
 	end)
 
@@ -257,10 +259,10 @@ function Settings.start()
 		Position = UDim2.new(1, -40, 0, 8),
 		Text = "X",
 	})
-	toggle.MouseButton1Click:Connect(function()
+	toggle.Activated:Connect(function()
 		panel.Visible = not panel.Visible
 	end)
-	close.MouseButton1Click:Connect(function()
+	close.Activated:Connect(function()
 		panel.Visible = false
 	end)
 

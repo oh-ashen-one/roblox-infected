@@ -1,9 +1,15 @@
 --!strict
--- Tracks whether any full-screen menu panel (shop, settings, quests, season, leaderboard)
--- is open, so the camera knows when to release the locked mouse and let you click things.
+-- Tracks whether any interactive menu / modal is open, so CameraController releases the
+-- locked combat mouse and the player can click buttons.
 --
--- Panels register once with `track(panel)`; visibility is observed rather than pushed, so a
--- module never has to remember to tell us it closed.
+-- CONTRACT: every client UI that shows a panel the player must click (shop, settings,
+-- quests, season, leaderboard, tutorial, daily reward, map vote, emote wheel, controls
+-- rebind, …) MUST call MenuState.track(thatPanel). Track the outermost Visible=false
+-- root (dimmer or panel) — not a permanently-visible HUD chrome button.
+--
+-- CameraController ALSO frees the cursor outside ACTIVE combat and while Alt is held, so
+-- lobby/intermission HUD toggles work without opening a tracked panel first. MenuState is
+-- still required for modals that appear mid-round (daily, emote, tutorial).
 
 local MenuState = {}
 

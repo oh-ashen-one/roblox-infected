@@ -33,7 +33,7 @@ local Sounds = require(script.UI.Sounds)
 
 local remotes = Remotes.client()
 
-CameraController.start()
+CameraController.start(remotes)
 local actions = CombatController.start(remotes)
 HUD.start(remotes)
 RoleCard.start(remotes)

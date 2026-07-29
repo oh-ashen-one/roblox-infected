@@ -136,7 +136,7 @@ function Quests.start(remotes: any)
 					row.claim.Text = "CLAIM"
 					row.claim.BackgroundColor3 = Theme.Colors.Gold
 					row.claim.TextColor3 = Theme.Colors.Bg
-					row.claim.MouseButton1Click:Connect(function()
+					row.claim.Activated:Connect(function()
 						remotes.fire("ClaimQuest", { scope = scope, questId = q.id })
 						row.claim.Text = "..."
 					end)
@@ -153,10 +153,10 @@ function Quests.start(remotes: any)
 		pip.Visible = anyClaimable
 	end
 
-	toggle.MouseButton1Click:Connect(function()
+	toggle.Activated:Connect(function()
 		panel.Visible = not panel.Visible
 	end)
-	closeBtn.MouseButton1Click:Connect(function()
+	closeBtn.Activated:Connect(function()
 		panel.Visible = false
 	end)
 

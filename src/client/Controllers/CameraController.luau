@@ -9,6 +9,11 @@
 -- so the crosshair at the middle of the screen is genuinely where the gun points. The camera
 -- sits over the right shoulder; because the character is yaw-aligned to the camera, the
 -- Humanoid.CameraOffset X axis is exactly "to the shooter's right".
+--
+-- Mouse lock is ONLY on during ACTIVE combat. Lobby / intermission / reveal keep a free
+-- cursor so shop, daily, map vote, settings, etc. are always clickable. Any MenuState panel
+-- (tutorial, daily, emote wheel, shop, …) also unlocks. Hold Left Alt to free the cursor
+-- mid-round without opening a menu.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -36,6 +41,10 @@ local state = {
 	-- Touch keeps the stock camera and cursor entirely; mouse lock would break the thumbsticks.
 	locking = not UserInputService.TouchEnabled,
 	menuOpen = false,
+	-- True only while a live round is ACTIVE (combat). Everything else is free-cursor UI time.
+	combatActive = false,
+	-- Hold Left Alt to free the mouse mid-round (click shop/settings without a keybind).
+	freeMouseHold = false,
 }
 
 local shakeSeed = Random.new()
@@ -90,7 +99,17 @@ function CameraController.stance(): { ads: boolean, moving: boolean, sprinting: 
 end
 
 local function wantsMouseLock(): boolean
-	return state.locking and not state.menuOpen and not UserInputService.TouchEnabled
+	if not state.locking or UserInputService.TouchEnabled then
+		return false
+	end
+	if state.menuOpen or state.freeMouseHold then
+		return false
+	end
+	-- Free cursor outside live combat so every HUD / popup is clickable without a special case.
+	if not state.combatActive then
+		return false
+	end
+	return true
 end
 
 local function applyMouseBehavior()
@@ -103,11 +122,36 @@ local function applyMouseBehavior()
 	end
 end
 
-function CameraController.start()
+function CameraController.start(remotes: any?)
 	MenuState.onChanged(function(open)
 		state.menuOpen = open
 		applyMouseBehavior()
 	end)
+
+	-- Hold Alt to free the cursor mid-round (click any HUD button without opening a menu first).
+	UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		if gameProcessed then
+			return
+		end
+		if input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then
+			state.freeMouseHold = true
+			applyMouseBehavior()
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(input)
+		if input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.RightAlt then
+			state.freeMouseHold = false
+			applyMouseBehavior()
+		end
+	end)
+
+	if remotes then
+		remotes.on("RoundState", function(payload)
+			local s = payload and payload.state
+			state.combatActive = s == "ACTIVE"
+			applyMouseBehavior()
+		end)
+	end
 
 	-- Roblox resets MouseBehavior on its own in a few cases (respawn, focus loss), so we
 	-- reassert it every frame rather than only on change.
@@ -146,7 +190,7 @@ function CameraController.start()
 				root.CFrame = CFrame.lookAt(root.Position, root.Position + flat)
 			end
 		elseif humanoid and not humanoid.AutoRotate then
-			-- Menu open, dead, or touch device: give control back to the stock camera.
+			-- Menu open, free-cursor phase, dead, or touch device: stock camera control.
 			humanoid.AutoRotate = true
 		end
 

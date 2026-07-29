@@ -99,10 +99,10 @@ function Leaderboard.start(remotes: any)
 	local winsHolder = column(panel, 0, "MOST WINS")
 	local convHolder = column(panel, 0.5, "MOST INFECTIONS")
 
-	toggle.MouseButton1Click:Connect(function()
+	toggle.Activated:Connect(function()
 		panel.Visible = not panel.Visible
 	end)
-	closeBtn.MouseButton1Click:Connect(function()
+	closeBtn.Activated:Connect(function()
 		panel.Visible = false
 	end)
 

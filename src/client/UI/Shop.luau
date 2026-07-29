@@ -89,7 +89,7 @@ function Shop.start(remotes: any)
 			Text = weaponId,
 			TextSize = 14,
 		})
-		button.MouseButton1Click:Connect(function()
+		button.Activated:Connect(function()
 			remotes.fire("SelectLoadout", { primary = weaponId })
 		end)
 		loadoutButtons[weaponId] = button
@@ -112,7 +112,7 @@ function Shop.start(remotes: any)
 		BackgroundColor3 = Theme.Colors.Gold,
 		TextColor3 = Theme.Colors.Bg,
 	})
-	buyCrate.MouseButton1Click:Connect(function()
+	buyCrate.Activated:Connect(function()
 		remotes.fire("BuyCrate", { currency = "Coins" })
 	end)
 	-- Open with an earned key (from daily rewards / quests) instead of coins.
@@ -124,7 +124,7 @@ function Shop.start(remotes: any)
 		BackgroundColor3 = Theme.Colors.Survivor,
 		TextColor3 = Theme.Colors.Bg,
 	})
-	keyCrate.MouseButton1Click:Connect(function()
+	keyCrate.Activated:Connect(function()
 		remotes.fire("BuyCrate", { currency = "Keys" })
 	end)
 
@@ -201,7 +201,7 @@ function Shop.start(remotes: any)
 				stripe.BorderSizePixel = 0
 				stripe.BackgroundColor3 = rarityColor(skin.rarity)
 				stripe.Parent = button
-				button.MouseButton1Click:Connect(function()
+				button.Activated:Connect(function()
 					remotes.fire("EquipSkin", { skinId = skin.id })
 				end)
 			end
@@ -222,7 +222,7 @@ function Shop.start(remotes: any)
 				stripe.BorderSizePixel = 0
 				stripe.BackgroundColor3 = rarityColor(title.rarity)
 				stripe.Parent = button
-				button.MouseButton1Click:Connect(function()
+				button.Activated:Connect(function()
 					remotes.fire("EquipTitle", { titleId = title.id })
 				end)
 			end
@@ -276,10 +276,10 @@ function Shop.start(remotes: any)
 	local function setOpen(open: boolean)
 		panel.Visible = open
 	end
-	toggle.MouseButton1Click:Connect(function()
+	toggle.Activated:Connect(function()
 		setOpen(not panel.Visible)
 	end)
-	close.MouseButton1Click:Connect(function()
+	close.Activated:Connect(function()
 		setOpen(false)
 	end)
 	UserInputService.InputBegan:Connect(function(input, gameProcessed)

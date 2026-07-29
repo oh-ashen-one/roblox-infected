@@ -62,7 +62,7 @@ function EmoteWheel.start(remotes: any)
 			Text = ("%d\n%s"):format(i, emote.label),
 			TextSize = 13,
 		})
-		button.MouseButton1Click:Connect(function()
+		button.Activated:Connect(function()
 			play(emote.id)
 		end)
 	end
@@ -85,7 +85,8 @@ function EmoteWheel.start(remotes: any)
 		if gameProcessed then
 			return
 		end
-		if input.KeyCode == Enum.KeyCode.B or input.KeyCode == Enum.KeyCode.DPadUp then
+		-- G (not B — B is Shop). DPadUp on gamepad.
+		if input.KeyCode == Enum.KeyCode.G or input.KeyCode == Enum.KeyCode.DPadUp then
 			setOpen(not panel.Visible)
 			return
 		end

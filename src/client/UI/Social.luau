@@ -32,7 +32,7 @@ function Social.start(_remotes: any)
 		button.Visible = ok and canInvite == true
 	end)
 
-	button.MouseButton1Click:Connect(function()
+	button.Activated:Connect(function()
 		pcall(function()
 			SocialService:PromptGameInvite(LocalPlayer)
 		end)

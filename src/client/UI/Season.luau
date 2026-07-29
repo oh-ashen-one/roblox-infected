@@ -137,7 +137,7 @@ function Season.start(remotes: any)
 				anyClaimable = true
 				freeBtn.BackgroundColor3 = Theme.Colors.Gold
 				freeBtn.TextColor3 = Theme.Colors.Bg
-				freeBtn.MouseButton1Click:Connect(function()
+				freeBtn.Activated:Connect(function()
 					remotes.fire("ClaimSeasonTier", { tier = t.tier, track = "free" })
 				end)
 			end
@@ -150,7 +150,7 @@ function Season.start(remotes: any)
 				anyClaimable = true
 				premBtn.BackgroundColor3 = Theme.Colors.Survivor
 				premBtn.TextColor3 = Theme.Colors.Bg
-				premBtn.MouseButton1Click:Connect(function()
+				premBtn.Activated:Connect(function()
 					remotes.fire("ClaimSeasonTier", { tier = t.tier, track = "premium" })
 				end)
 			else
@@ -160,10 +160,10 @@ function Season.start(remotes: any)
 		pip.Visible = anyClaimable
 	end
 
-	toggle.MouseButton1Click:Connect(function()
+	toggle.Activated:Connect(function()
 		panel.Visible = not panel.Visible
 	end)
-	closeBtn.MouseButton1Click:Connect(function()
+	closeBtn.Activated:Connect(function()
 		panel.Visible = false
 	end)
 	remotes.on("SeasonStatus", render)
